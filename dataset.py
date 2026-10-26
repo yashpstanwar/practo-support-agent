@@ -38,3 +38,24 @@ FEE_MIN, FEE_MAX = 300, 1500
 
 REQUIRED_CATEGORIES = list(CATEGORY_WEIGHTS)
 REQUIRED_STATUSES = list(STATUS_WEIGHTS)
+
+
+def generate(seed: int = SEED, n: int = N_RECORDS) -> list[dict]:
+    rng = random.Random(seed)
+    cats = rng.choices(list(CATEGORY_WEIGHTS), weights=list(CATEGORY_WEIGHTS.values()), k=n)
+    stats = rng.choices(list(STATUS_WEIGHTS), weights=list(STATUS_WEIGHTS.values()), k=n)
+    records = []
+    for i in range(n):
+        lo, hi = FEE_BANDS[cats[i]]
+        fee = int(round(rng.uniform(lo, hi) / 50.0) * 50)
+        records.append(
+            {
+                "record_id": f"APT-{1001 + i}",
+                "category": cats[i],
+                "status": stats[i],
+                "consultation_fee_inr": fee,
+                "days_since_created": rng.randint(0, 30),
+                "follow_up_required": rng.random() < FOLLOW_UP_PROBABILITY,
+            }
+        )
+    return records
