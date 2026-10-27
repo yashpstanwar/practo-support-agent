@@ -59,3 +59,34 @@ def generate(seed: int = SEED, n: int = N_RECORDS) -> list[dict]:
             }
         )
     return records
+
+
+def summarize(records: list[dict]) -> dict:
+    cat = Counter(r["category"] for r in records)
+    st = Counter(r["status"] for r in records)
+    fu = sum(r["follow_up_required"] for r in records)
+    return {
+        "n": len(records),
+        "category_counts": {c: cat.get(c, 0) for c in REQUIRED_CATEGORIES},
+        "status_counts": {s: st.get(s, 0) for s in REQUIRED_STATUSES},
+        "follow_up_true": fu,
+        "follow_up_pct": round(100.0 * fu / len(records), 2),
+        "fee_min": min(r["consultation_fee_inr"] for r in records),
+        "fee_max": max(r["consultation_fee_inr"] for r in records),
+    }
+
+
+def validate(records: list[dict]) -> dict:
+    s = summarize(records)
+    assert s["n"] >= 40, "need >= 40 records"
+    for c in REQUIRED_CATEGORIES:
+        assert s["category_counts"][c] >= 3, f"category {c} has {s['category_counts'][c]} < 3"
+    for st in REQUIRED_STATUSES:
+        assert s["status_counts"][st] >= 1, f"status {st} has {s['status_counts'][st]} < 1"
+    assert 10.0 <= s["follow_up_pct"] <= 30.0, (
+        f"follow_up_pct {s['follow_up_pct']}% outside required [10%, 30%] band"
+    )
+    for r in records:
+        assert 0 <= r["days_since_created"] <= 30, "days_since_created outside [0, 30]"
+        assert FEE_MIN <= r["consultation_fee_inr"] <= FEE_MAX, "fee outside valid band"
+    return s
