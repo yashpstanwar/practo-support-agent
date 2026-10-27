@@ -1,0 +1,29 @@
+$ MOCK_LLM=1 python dataset.py
+
+Generated 60 appointments  (SEED=42)
+
+Count per category (every given category must be >= 3):
+  General Medicine    24
+  Cardiology           7
+  Dermatology         13
+  Pediatrics          10
+  Orthopedics          6
+
+Count per status (every given status must be >= 1):
+  Scheduled           21
+  Completed           18
+  Rescheduled          6
+  Cancelled            7
+  No-Show              8
+
+follow_up_required=True: 16/60 = 26.67%  (required band 10%-30%)
+consultation_fee_inr observed range: INR 300 - 1250
+
+First 5 records:
+   {'record_id': 'APT-1001', 'category': 'Dermatology', 'status': 'No-Show', 'consultation_fee_inr': 900, 'days_since_created': 17, 'follow_up_required': False}
+   {'record_id': 'APT-1002', 'category': 'General Medicine', 'status': 'Completed', 'consultation_fee_inr': 600, 'days_since_created': 29, 'follow_up_required': True}
+   {'record_id': 'APT-1003', 'category': 'General Medicine', 'status': 'Completed', 'consultation_fee_inr': 400, 'days_since_created': 0, 'follow_up_required': True}
+   {'record_id': 'APT-1004', 'category': 'General Medicine', 'status': 'Rescheduled', 'consultation_fee_inr': 400, 'days_since_created': 26, 'follow_up_required': False}
+   {'record_id': 'APT-1005', 'category': 'Pediatrics', 'status': 'Cancelled', 'consultation_fee_inr': 500, 'days_since_created': 7, 'follow_up_required': False}
+
+ALL STRUCTURAL CHECKS PASSED

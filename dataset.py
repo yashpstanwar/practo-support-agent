@@ -1,6 +1,25 @@
 """Task 1 - seeded, deterministic appointment dataset for the Practo track.
 
 Run:  python dataset.py
+
+Design choices (also stated in README.md):
+  * SEED = 42, N_RECORDS = 60
+  * Category weights: General Medicine 0.30, Cardiology 0.18, Dermatology 0.18,
+    Pediatrics 0.17, Orthopedics 0.17
+  * Status weights: Scheduled 0.34, Completed 0.30, Rescheduled 0.14,
+    Cancelled 0.12, No-Show 0.10
+  * follow_up_required ~ Bernoulli(0.20)
+  * consultation_fee_inr: drawn uniformly inside a per-specialty band and
+    rounded to the nearest INR 50; overall range INR 300-1500.
+    Reasoning: in-clinic consultations booked through Indian aggregators
+    typically cost a few hundred rupees for a GP and up to roughly INR 1,500 for
+    a senior cardiologist, so specialty bands inside 300-1500 are realistic.
+  * days_since_created: uniform integer 0-30.
+
+The generator never edits individual records. If a structural check fails,
+`validate()` raises and the fix is to change SEED or the weights.
+All data is fabricated; there is no patient name, diagnosis, phone or
+insurance ID in this dataset.
 """
 from __future__ import annotations
 
@@ -79,14 +98,37 @@ def summarize(records: list[dict]) -> dict:
 def validate(records: list[dict]) -> dict:
     s = summarize(records)
     assert s["n"] >= 40, "need >= 40 records"
-    for c in REQUIRED_CATEGORIES:
-        assert s["category_counts"][c] >= 3, f"category {c} has {s['category_counts'][c]} < 3"
-    for st in REQUIRED_STATUSES:
-        assert s["status_counts"][st] >= 1, f"status {st} has {s['status_counts'][st]} < 1"
-    assert 10.0 <= s["follow_up_pct"] <= 30.0, (
-        f"follow_up_pct {s['follow_up_pct']}% outside required [10%, 30%] band"
-    )
+    for c, k in s["category_counts"].items():
+        assert k >= 3, f"category {c} has only {k} records (< 3)"
+    for st, k in s["status_counts"].items():
+        assert k >= 1, f"status {st} missing"
+    assert 10.0 <= s["follow_up_pct"] <= 30.0, f"follow-up % {s['follow_up_pct']} outside 10-30"
     for r in records:
-        assert 0 <= r["days_since_created"] <= 30, "days_since_created outside [0, 30]"
-        assert FEE_MIN <= r["consultation_fee_inr"] <= FEE_MAX, "fee outside valid band"
+        assert FEE_MIN <= r["consultation_fee_inr"] <= FEE_MAX
+        assert 0 <= r["days_since_created"] <= 30
+        assert isinstance(r["follow_up_required"], bool)
     return s
+
+
+APPOINTMENTS: list[dict] = generate()
+APPOINTMENTS_BY_ID: dict[str, dict] = {r["record_id"]: r for r in APPOINTMENTS}
+
+
+if __name__ == "__main__":
+    s = validate(APPOINTMENTS)
+    print(f"Generated {s['n']} appointments  (SEED={SEED})")
+    print("\nCount per category (every given category must be >= 3):")
+    for c, k in s["category_counts"].items():
+        print(f"  {c:<18} {k:>3}")
+    print("\nCount per status (every given status must be >= 1):")
+    for st, k in s["status_counts"].items():
+        print(f"  {st:<18} {k:>3}")
+    print(
+        f"\nfollow_up_required=True: {s['follow_up_true']}/{s['n']} = {s['follow_up_pct']}%"
+        "  (required band 10%-30%)"
+    )
+    print(f"consultation_fee_inr observed range: INR {s['fee_min']} - {s['fee_max']}")
+    print("\nFirst 5 records:")
+    for r in APPOINTMENTS[:5]:
+        print("  ", r)
+    print("\nALL STRUCTURAL CHECKS PASSED")
