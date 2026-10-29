@@ -104,3 +104,12 @@ are written into `kb/03_consultation_fees.md`, so the KB and data agree).
 `follow_up_required=True`: **16 / 60 = 26.67 %** (inside the 10–30 % band).
 `validate()` asserts every threshold and raises instead of patching records.
 All data is fabricated; the dataset contains no names, diagnoses, phone numbers or insurance IDs.
+
+### Task 2 — knowledge base
+
+12 documents in `kb/`, 4 sentences each, written for this brief (the policies are
+illustrative, not Practo's real terms):
+appointment booking · cancellation/rescheduling window · consultation fees by specialty ·
+insurance claims · prescription refills · lab turnaround times · telemedicine
+eligibility · emergency protocol · patient-data privacy · follow-up discount ·
+second opinion · home-visit eligibility.
