@@ -1,0 +1,35 @@
+$ MOCK_LLM=1 python -m rag.build_index
+
+Loaded 12 knowledge-base documents from kb/
+  01_appointment_booking           sentences=4  fixed_chunks=3  chars=391
+  02_cancellation_rescheduling     sentences=4  fixed_chunks=3  chars=436
+  03_consultation_fees             sentences=4  fixed_chunks=3  chars=429
+  04_insurance_claims              sentences=4  fixed_chunks=4  chars=505
+  05_prescription_refills          sentences=4  fixed_chunks=3  chars=456
+  06_lab_turnaround                sentences=4  fixed_chunks=3  chars=386
+  07_telemedicine                  sentences=4  fixed_chunks=3  chars=485
+  08_emergency_protocol            sentences=4  fixed_chunks=3  chars=449
+  09_data_privacy                  sentences=4  fixed_chunks=3  chars=420
+  10_follow_up_discount            sentences=4  fixed_chunks=3  chars=400
+  11_second_opinion                sentences=4  fixed_chunks=3  chars=483
+  12_home_visits                   sentences=4  fixed_chunks=3  chars=466
+
+Embedding model: sentence-transformers/all-MiniLM-L6-v2 (local copy, SHA-256 verified against Hugging Face)
+Fixed-size chunking: size=200 chars, overlap=50 chars
+Collection 'practo_kb_fixed' (fixed): 37 chunks indexed (added 37)
+Collection 'practo_kb_sentence' (sentence): 48 chunks indexed (added 48)
+
+Example fixed-size chunks of 02_cancellation_rescheduling:
+  [02_cancellation_rescheduling::fixed::0] Appointments can be cancelled or rescheduled free of charge up to 4 hours before the scheduled slot. Cancellations made less than 4 hours before the slot forfeit 50 percent of the prepaid
+  [02_cancellation_rescheduling::fixed::1] before the slot forfeit 50 percent of the prepaid consultation fee. Each appointment can be rescheduled a maximum of two times, after which it must be cancelled and booked again. A patient who does
+  [02_cancellation_rescheduling::fixed::2] be cancelled and booked again. A patient who does not arrive within 15 minutes of the slot is marked as a No-Show and the prepaid fee is not refunded.
+
+Sample query on BOTH collections: 'What is the fee for a dermatologist?'
+  -- practo_kb_fixed
+     sim=0.625  03_consultation_fees         | consultations cost between 400 and 800 rupees. Dermatology consultations cost between 500 
+     sim=0.510  03_consultation_fees         | Consultation fees are set by specialty and by the doctor's seniority. General Medicine con
+     sim=0.492  03_consultation_fees         | 600 and 1200 rupees. Cardiology consultations are the most expensive, ranging from 800 to 
+  -- practo_kb_sentence
+     sim=0.701  03_consultation_fees         | Dermatology consultations cost between 500 and 1000 rupees, and Orthopedics consultations 
+     sim=0.492  03_consultation_fees         | General Medicine consultations cost between 300 and 600 rupees, and Pediatrics consultatio
+     sim=0.490  03_consultation_fees         | Cardiology consultations are the most expensive, ranging from 800 to 1500 rupees, and ever

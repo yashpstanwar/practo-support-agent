@@ -113,3 +113,13 @@ appointment booking · cancellation/rescheduling window · consultation fees by 
 insurance claims · prescription refills · lab turnaround times · telemedicine
 eligibility · emergency protocol · patient-data privacy · follow-up discount ·
 second opinion · home-visit eligibility.
+
+### Task 3 — two chunking strategies, two collections
+
+* **Fixed-size with overlap** → collection `practo_kb_fixed`: 200-character window,
+  50-character overlap, snapped to word boundaries (37 chunks).
+* **Sentence-based** → collection `practo_kb_sentence`: one chunk per sentence (48 chunks).
+* Both embedded with `all-MiniLM-L6-v2` (L2-normalised; each chunk embedded as
+  `"<doc title>: <chunk text>"` so short sentences keep their topic), stored in
+  separate ChromaDB collections with cosine distance. A sample query against both
+  collections is in transcript 02.
