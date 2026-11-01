@@ -1,0 +1,34 @@
+$ MOCK_LLM=1 python -m evaluation.calibrate_threshold
+
+=== Collection: practo_kb_fixed (fixed) ===
+  IN   top1=0.6276  How late can I cancel my appointment without losing any money?
+  IN   top1=0.8387  How much does a cardiology consultation cost?
+  IN   top1=0.6142  How long will my thyroid test report take?
+  IN   top1=0.6803  Can my first orthopedic consultation be done over a video call?
+  IN   top1=0.6430  Is a follow-up visit free, and can a doctor visit me at home after my surgery?
+  IN   top1=0.5969  What documents do I need to upload to claim insurance for my consultation?
+  OUT  top1=0.1197  Who won the cricket world cup in 2011?
+  OUT  top1=0.3324  Recommend a good gaming laptop under 80000 rupees.
+  OUT  top1=0.0517  What is the capital city of Australia?
+  OUT  top1=0.0914  Write me a poem about the monsoon.
+  in-scope cluster:     min=0.5969 max=0.8387
+  out-of-scope cluster: min=0.0517 max=0.3324
+  gap = (0.3324, 0.5969) -> midpoint 0.4647
+
+=== Collection: practo_kb_sentence (sentence) ===
+  IN   top1=0.6339  How late can I cancel my appointment without losing any money?
+  IN   top1=0.8370  How much does a cardiology consultation cost?
+  IN   top1=0.7221  How long will my thyroid test report take?
+  IN   top1=0.7169  Can my first orthopedic consultation be done over a video call?
+  IN   top1=0.7049  Is a follow-up visit free, and can a doctor visit me at home after my surgery?
+  IN   top1=0.5548  What documents do I need to upload to claim insurance for my consultation?
+  OUT  top1=0.0891  Who won the cricket world cup in 2011?
+  OUT  top1=0.3065  Recommend a good gaming laptop under 80000 rupees.
+  OUT  top1=0.0461  What is the capital city of Australia?
+  OUT  top1=0.0740  Write me a poem about the monsoon.
+  in-scope cluster:     min=0.5548 max=0.8370
+  out-of-scope cluster: min=0.0461 max=0.3065
+  gap = (0.3065, 0.5548) -> midpoint 0.4306
+
+Configured IDK_THRESHOLD (config.py) = 0.43
+It is chosen inside the gap observed on the agent's collection (practo_kb_sentence), not taken from a tutorial preset.

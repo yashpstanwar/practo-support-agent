@@ -38,7 +38,7 @@ TOP_K = 3
 # Calibrated empirically: see evaluation/calibrate_threshold.py and
 # transcripts/03_task4_threshold_calibration.txt. Measured gap on the
 # sentence collection: out-of-scope max 0.3065, in-scope min 0.5548 -> 0.43.
-IDK_THRESHOLD: float = float(os.getenv("IDK_THRESHOLD", "0.50"))
+IDK_THRESHOLD: float = float(os.getenv("IDK_THRESHOLD", "0.43"))
 
 # Output-side groundedness: an answer sentence counts as supported when its
 # cosine similarity to some retrieved chunk is at least this value.
