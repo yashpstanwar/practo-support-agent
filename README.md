@@ -123,3 +123,39 @@ second opinion · home-visit eligibility.
   `"<doc title>: <chunk text>"` so short sentences keep their topic), stored in
   separate ChromaDB collections with cosine distance. A sample query against both
   collections is in transcript 02.
+
+### Task 4 — grounded generation & the calibrated "I don't know" threshold
+
+`MOCK_LLM` generation is **extractive**: it can only return sentences that exist in the
+top-k retrieved chunks, ranked by similarity to the question — it cannot invent text.
+If the top-1 cosine similarity is below `IDK_THRESHOLD`, it answers
+*"I don't know based on the clinic policy knowledge base."*
+
+**Calibration (measured, `transcripts/03_task4_threshold_calibration.txt`)** — top-1
+cosine similarity of 6 in-scope and 4 deliberately out-of-scope queries:
+
+| Query | Type | `practo_kb_fixed` | `practo_kb_sentence` |
+|---|---|---|---|
+| How late can I cancel my appointment without losing any money? | in | 0.6276 | 0.6339 |
+| How much does a cardiology consultation cost? | in | 0.8387 | 0.8370 |
+| How long will my thyroid test report take? | in | 0.6142 | 0.7221 |
+| Can my first orthopedic consultation be done over a video call? | in | 0.6803 | 0.7169 |
+| Is a follow-up visit free, and can a doctor visit me at home after my surgery? | in | 0.6430 | 0.7049 |
+| What documents do I need to upload to claim insurance for my consultation? | in | 0.5969 | 0.5548 |
+| Who won the cricket world cup in 2011? | out | 0.1197 | 0.0891 |
+| Recommend a good gaming laptop under 80000 rupees. | out | 0.3324 | 0.3065 |
+| What is the capital city of Australia? | out | 0.0517 | 0.0461 |
+| Write me a poem about the monsoon. | out | 0.0914 | 0.0740 |
+| **Cluster range** | in | 0.597 – 0.839 | **0.555 – 0.837** |
+| **Cluster range** | out | 0.052 – 0.332 | **0.046 – 0.307** |
+
+On the agent's collection (`practo_kb_sentence`) the out-of-scope cluster tops out at
+**0.3065** and the in-scope cluster starts at **0.5548**, so I set
+**`IDK_THRESHOLD = 0.43`** — the midpoint of that gap (0.4306), which also sits inside
+the fixed-size collection's gap (0.332–0.597). A tutorial default of 0.6 or 0.7 would
+have wrongly refused the insurance query (0.555).
+
+**Demonstration (`transcripts/04_task4_grounded_generation.txt`)**: all 6 in-scope
+queries are answered with sentences taken verbatim from the retrieved chunks (top-1
+0.555–0.837); the out-of-scope *"Who won the cricket world cup in 2011?"* scores
+0.089 and returns the "I don't know" fallback.

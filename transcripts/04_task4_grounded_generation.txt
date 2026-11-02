@@ -1,0 +1,56 @@
+$ MOCK_LLM=1 python -m demos.demo_grounded_generation
+
+MOCK_LLM=True  collection=practo_kb_sentence  IDK_THRESHOLD=0.43
+
+---- In-scope queries ----
+Q: How late can I cancel my appointment without losing any money?
+   retrieved sim=0.634 02_cancellation_rescheduling::sent::0
+   retrieved sim=0.605 02_cancellation_rescheduling::sent::1
+   retrieved sim=0.555 02_cancellation_rescheduling::sent::3
+   decision: top-1 similarity 0.634 >= threshold 0.43 -> ANSWER
+A: Appointments can be cancelled or rescheduled free of charge up to 4 hours before the scheduled slot. Cancellations made less than 4 hours before the slot forfeit 50 percent of the prepaid consultation fee.
+
+Q: How much does a cardiology consultation cost?
+   retrieved sim=0.837 03_consultation_fees::sent::3
+   retrieved sim=0.640 03_consultation_fees::sent::1
+   retrieved sim=0.628 03_consultation_fees::sent::2
+   decision: top-1 similarity 0.837 >= threshold 0.43 -> ANSWER
+A: Cardiology consultations are the most expensive, ranging from 800 to 1500 rupees, and every fee includes GST.
+
+Q: How long will my thyroid test report take?
+   retrieved sim=0.722 06_lab_turnaround::sent::1
+   retrieved sim=0.472 06_lab_turnaround::sent::2
+   retrieved sim=0.471 06_lab_turnaround::sent::0
+   decision: top-1 similarity 0.722 >= threshold 0.43 -> ANSWER
+A: Specialised tests such as thyroid panels and vitamin levels take 48 to 72 hours.
+
+Q: Can my first orthopedic consultation be done over a video call?
+   retrieved sim=0.717 07_telemedicine::sent::2
+   retrieved sim=0.632 07_telemedicine::sent::0
+   retrieved sim=0.549 07_telemedicine::sent::3
+   decision: top-1 similarity 0.717 >= threshold 0.43 -> ANSWER
+A: A first consultation for Orthopedics or Cardiology must be in person, but later follow-ups may be done by video.
+
+Q: Is a follow-up visit free, and can a doctor visit me at home after my surgery?
+   retrieved sim=0.705 10_follow_up_discount::sent::0
+   retrieved sim=0.625 10_follow_up_discount::sent::3
+   retrieved sim=0.610 12_home_visits::sent::0
+   decision: top-1 similarity 0.705 >= threshold 0.43 -> ANSWER
+A: A follow-up visit with the same doctor within 7 days of the original consultation is free of charge. Home visits are available for patients above 65 years of age, bedridden patients and patients recovering from surgery within city limits.
+
+Q: What documents do I need to upload to claim insurance for my consultation?
+   retrieved sim=0.555 04_insurance_claims::sent::1
+   retrieved sim=0.501 04_insurance_claims::sent::0
+   retrieved sim=0.424 04_insurance_claims::sent::2
+   decision: top-1 similarity 0.555 >= threshold 0.43 -> ANSWER
+A: To start a claim, upload the itemised invoice, the doctor's prescription and your insurance policy number in the Claims section of the app within 30 days of the visit.
+
+---- Deliberately out-of-scope query ----
+Q: Who won the cricket world cup in 2011?
+   retrieved sim=0.089 12_home_visits::sent::2
+   retrieved sim=0.084 01_appointment_booking::sent::1
+   retrieved sim=0.080 12_home_visits::sent::0
+   decision: top-1 similarity 0.089 < threshold 0.43 -> FALLBACK
+A: I don't know based on the clinic policy knowledge base.
+
+OK: all in-scope queries answered from context; out-of-scope query triggered the fallback.
