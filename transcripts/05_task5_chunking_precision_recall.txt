@@ -1,0 +1,77 @@
+$ MOCK_LLM=1 python -m evaluation.chunking_eval
+
+=== practo_kb_fixed (fixed) ===
+  Q1: How late can I cancel my appointment without losing any money?
+      first chunk parents: ['02_cancellation_rescheduling', '02_cancellation_rescheduling', '02_cancellation_rescheduling', '10_follow_up_discount', '10_follow_up_discount', '01_appointment_booking']
+      top-3 unique docs:   ['02_cancellation_rescheduling', '10_follow_up_discount', '01_appointment_booking']
+      relevant:            ['02_cancellation_rescheduling']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q2: How much does a cardiology consultation cost?
+      first chunk parents: ['03_consultation_fees', '03_consultation_fees', '03_consultation_fees', '11_second_opinion', '10_follow_up_discount', '08_emergency_protocol']
+      top-3 unique docs:   ['03_consultation_fees', '11_second_opinion', '10_follow_up_discount']
+      relevant:            ['03_consultation_fees']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q3: How long will my thyroid test report take?
+      first chunk parents: ['06_lab_turnaround', '06_lab_turnaround', '06_lab_turnaround', '11_second_opinion', '04_insurance_claims', '04_insurance_claims']
+      top-3 unique docs:   ['06_lab_turnaround', '11_second_opinion', '04_insurance_claims']
+      relevant:            ['06_lab_turnaround']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q4: Can my first orthopedic consultation be done over a video call?
+      first chunk parents: ['07_telemedicine', '07_telemedicine', '07_telemedicine', '01_appointment_booking', '11_second_opinion', '08_emergency_protocol']
+      top-3 unique docs:   ['07_telemedicine', '01_appointment_booking', '11_second_opinion']
+      relevant:            ['07_telemedicine']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q5: Is a follow-up visit free, and can a doctor visit me at home after my surgery?
+      first chunk parents: ['10_follow_up_discount', '10_follow_up_discount', '12_home_visits', '10_follow_up_discount', '08_emergency_protocol', '01_appointment_booking']
+      top-3 unique docs:   ['10_follow_up_discount', '12_home_visits', '08_emergency_protocol']
+      relevant:            ['10_follow_up_discount', '12_home_visits']
+      P@3 = 2/3 = 0.667    R@3 = 2/2 = 1.000
+  Q6: What documents do I need to upload to claim insurance for my consultation?
+      first chunk parents: ['04_insurance_claims', '04_insurance_claims', '04_insurance_claims', '09_data_privacy', '04_insurance_claims', '09_data_privacy']
+      top-3 unique docs:   ['04_insurance_claims', '09_data_privacy', '07_telemedicine']
+      relevant:            ['04_insurance_claims']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  MEAN P@3 = (0.333 + 0.333 + 0.333 + 0.333 + 0.667 + 0.333) / 6 = 0.389
+  MEAN R@3 = (1.000 + 1.000 + 1.000 + 1.000 + 1.000 + 1.000) / 6 = 1.000
+  mean rank of first relevant chunk: 1.00
+  mean similarity of best relevant chunk: 0.667
+
+=== practo_kb_sentence (sentence) ===
+  Q1: How late can I cancel my appointment without losing any money?
+      first chunk parents: ['02_cancellation_rescheduling', '02_cancellation_rescheduling', '02_cancellation_rescheduling', '02_cancellation_rescheduling', '10_follow_up_discount', '08_emergency_protocol']
+      top-3 unique docs:   ['02_cancellation_rescheduling', '10_follow_up_discount', '08_emergency_protocol']
+      relevant:            ['02_cancellation_rescheduling']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q2: How much does a cardiology consultation cost?
+      first chunk parents: ['03_consultation_fees', '03_consultation_fees', '03_consultation_fees', '03_consultation_fees', '07_telemedicine', '10_follow_up_discount']
+      top-3 unique docs:   ['03_consultation_fees', '07_telemedicine', '10_follow_up_discount']
+      relevant:            ['03_consultation_fees']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q3: How long will my thyroid test report take?
+      first chunk parents: ['06_lab_turnaround', '06_lab_turnaround', '06_lab_turnaround', '11_second_opinion', '06_lab_turnaround', '04_insurance_claims']
+      top-3 unique docs:   ['06_lab_turnaround', '11_second_opinion', '04_insurance_claims']
+      relevant:            ['06_lab_turnaround']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q4: Can my first orthopedic consultation be done over a video call?
+      first chunk parents: ['07_telemedicine', '07_telemedicine', '07_telemedicine', '01_appointment_booking', '11_second_opinion', '11_second_opinion']
+      top-3 unique docs:   ['07_telemedicine', '01_appointment_booking', '11_second_opinion']
+      relevant:            ['07_telemedicine']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  Q5: Is a follow-up visit free, and can a doctor visit me at home after my surgery?
+      first chunk parents: ['10_follow_up_discount', '10_follow_up_discount', '12_home_visits', '12_home_visits', '07_telemedicine', '10_follow_up_discount']
+      top-3 unique docs:   ['10_follow_up_discount', '12_home_visits', '07_telemedicine']
+      relevant:            ['10_follow_up_discount', '12_home_visits']
+      P@3 = 2/3 = 0.667    R@3 = 2/2 = 1.000
+  Q6: What documents do I need to upload to claim insurance for my consultation?
+      first chunk parents: ['04_insurance_claims', '04_insurance_claims', '04_insurance_claims', '07_telemedicine', '09_data_privacy', '04_insurance_claims']
+      top-3 unique docs:   ['04_insurance_claims', '07_telemedicine', '09_data_privacy']
+      relevant:            ['04_insurance_claims']
+      P@3 = 1/3 = 0.333    R@3 = 1/1 = 1.000
+  MEAN P@3 = (0.333 + 0.333 + 0.333 + 0.333 + 0.667 + 0.333) / 6 = 0.389
+  MEAN R@3 = (1.000 + 1.000 + 1.000 + 1.000 + 1.000 + 1.000) / 6 = 1.000
+  mean rank of first relevant chunk: 1.00
+  mean similarity of best relevant chunk: 0.695
+
+SUMMARY
+  fixed     mean P@3=0.389  mean R@3=1.000
+  sentence  mean P@3=0.389  mean R@3=1.000

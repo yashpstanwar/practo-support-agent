@@ -159,3 +159,33 @@ have wrongly refused the insurance query (0.555).
 queries are answered with sentences taken verbatim from the retrieved chunks (top-1
 0.555–0.837); the out-of-scope *"Who won the cricket world cup in 2011?"* scores
 0.089 and returns the "I don't know" fallback.
+
+### Task 5 — Precision@3 / Recall@3 (document level)
+
+Per query and collection: retrieve the top-15 chunks, map each chunk to its parent
+document, de-duplicate in rank order, keep the first 3 unique documents, then
+P@3 = |relevant ∩ top-3| / 3 and R@3 = |relevant ∩ top-3| / |relevant|. Because most
+queries have exactly one relevant document, the maximum attainable P@3 is 0.333 for
+those queries (0.667 for the two-document query). Full per-query arithmetic for both
+collections: `transcripts/05_task5_chunking_precision_recall.txt`.
+
+| Query (relevant docs) | Fixed P@3 | Fixed R@3 | Sentence P@3 | Sentence R@3 |
+|---|---|---|---|---|
+| Q1 cancel without losing money (02) | 1/3 = 0.333 | 1/1 = 1.000 | 1/3 = 0.333 | 1/1 = 1.000 |
+| Q2 cardiology fee (03) | 1/3 = 0.333 | 1/1 = 1.000 | 1/3 = 0.333 | 1/1 = 1.000 |
+| Q3 thyroid report time (06) | 1/3 = 0.333 | 1/1 = 1.000 | 1/3 = 0.333 | 1/1 = 1.000 |
+| Q4 first ortho visit by video (07) | 1/3 = 0.333 | 1/1 = 1.000 | 1/3 = 0.333 | 1/1 = 1.000 |
+| Q5 free follow-up + home visit (10, 12) | 2/3 = 0.667 | 2/2 = 1.000 | 2/3 = 0.667 | 2/2 = 1.000 |
+| Q6 insurance claim documents (04) | 1/3 = 0.333 | 1/1 = 1.000 | 1/3 = 0.333 | 1/1 = 1.000 |
+| **Mean** | **2.333/6 = 0.389** | **1.000** | **2.333/6 = 0.389** | **1.000** |
+| Mean similarity of best relevant chunk | 0.667 | | **0.695** | |
+
+**Recommendation:** both strategies tie on the graded metrics — mean P@3 = 0.389 (the
+ceiling for this query set) and mean R@3 = 1.000, with the relevant document ranked
+first for every query — so I deploy the **sentence-based collection**. It gives the
+higher mean similarity for the best relevant chunk (0.695 vs 0.667, and a higher top-1
+on 5 of 6 queries), and its chunks are whole sentences that the extractive generator
+can quote cleanly, whereas fixed-size chunks cut sentences mid-way
+(e.g. *"…A patient who does"*).
+
+---
