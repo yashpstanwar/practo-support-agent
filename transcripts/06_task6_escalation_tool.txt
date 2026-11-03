@@ -1,0 +1,11 @@
+$ MOCK_LLM=1 python tools.py
+
+Formula: escalation_score = 0.6 * follow_up_required + 0.4 * (days_since_created / 30)
+days_since_created percentiles in generated data: {25: 7.75, 50: 15.0, 75: 23.0, 80: 25.200000000000003, 90: 27.200000000000003}
+Threshold = 0.6 + 0.4 * (P50=15.0 / 30) = 0.8
+Records at/above threshold: 4/60 -> ['APT-1002', 'APT-1025', 'APT-1044', 'APT-1047']
+Score distribution percentiles: {50: 0.307, 75: 0.6, 90: 0.761, 95: 0.854}
+APT-1002 -> {'found': True, 'record_id': 'APT-1002', 'category': 'General Medicine', 'status': 'Completed', 'consultation_fee_inr': 600, 'follow_up_required': True, 'days_since_created': 29, 'escalation_score': 0.9867, 'escalation_threshold': 0.8, 'escalate': True}
+APT-1007 -> {'found': True, 'record_id': 'APT-1007', 'category': 'Orthopedics', 'status': 'Scheduled', 'consultation_fee_inr': 1100, 'follow_up_required': False, 'days_since_created': 24, 'escalation_score': 0.32, 'escalation_threshold': 0.8, 'escalate': False}
+APT-1022 -> {'found': True, 'record_id': 'APT-1022', 'category': 'Pediatrics', 'status': 'Scheduled', 'consultation_fee_inr': 600, 'follow_up_required': True, 'days_since_created': 13, 'escalation_score': 0.7733, 'escalation_threshold': 0.8, 'escalate': False}
+APT-9999 -> {'found': False, 'record_id': 'APT-9999', 'error': 'No appointment found with ID APT-9999.'}

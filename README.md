@@ -189,3 +189,24 @@ can quote cleanly, whereas fixed-size chunks cut sentences mid-way
 (e.g. *"…A patient who does"*).
 
 ---
+
+## Part 2 — LangGraph agent with tools, memory & guardrails
+
+### Task 6 — `check_appointment_status` and the escalation score
+
+```
+escalation_score = 0.6 * follow_up_required + 0.4 * (days_since_created / 30)
+escalate if escalation_score >= 0.80
+```
+
+* `follow_up_required` carries 60 % of the weight — a doctor-flagged follow-up is the
+  main clinical reason for a human to step in.
+* The age signal `days_since_created / 30` is normalised by the dataset's 30-day
+  maximum; the longer a flagged appointment stays open, the more likely the free /
+  discounted follow-up window (`kb/10`) is being missed.
+* **Threshold 0.80 = 0.6 + 0.4 × (15 / 30)**, where **15 days is the 50th percentile
+  (median) of `days_since_created` in my generated data** (P25 = 7.75, P50 = 15,
+  P75 = 23, P80 = 25.2). So a record escalates only when follow-up is required **and**
+  it is older than the median appointment; a record without follow-up scores at most
+  0.40 and never escalates on age alone. In this dataset **4 / 60 records (6.7 %)**
+  escalate (`APT-1002`, `APT-1025`, `APT-1044`, `APT-1047`) — a manageable queue.
