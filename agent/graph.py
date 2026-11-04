@@ -1,18 +1,23 @@
-"""Task 7 - LangGraph support agent with memory nodes.
+"""Task 7 - LangGraph support agent with intent classifier.
 """
 from __future__ import annotations
 
 import operator
 import os
+import re
 import uuid
 from typing import Annotated, Any, Optional, TypedDict
 
-from langchain_core.runnables import RunnableConfig
-
 import config
 from agent import memory as mem
+from tools import normalize_record_id
 
 VERBOSE = os.getenv("AGENT_VERBOSE", "1") == "1"
+
+STATUS_WORDS = re.compile(r"\b(status|fee|cost|charge|escalat\w*|follow[- ]?up|confirmed|scheduled|cancelled)\b", re.I)
+REFERS_BACK = re.compile(r"\b(its|for it|is it|does it|that one|this one|that appointment|this appointment|"
+                         r"same appointment|my appointment|that booking|my booking)\b", re.I)
+EXPLICIT_STATUS = re.compile(r"\b(status of|check (my|the) (appointment|booking)|appointment status|booking status)\b", re.I)
 
 
 class AgentState(TypedDict, total=False):
@@ -68,3 +73,19 @@ async def save_memory(state: AgentState) -> dict:
     mem.save(tid, {"thread_id": tid, "turns": turns, "last_record_id": rec_id})
     _log("save_memory", f"saved turn={state.get('turn')} last_record_id={rec_id}")
     return {"node_log": ["save_memory"]}
+
+
+async def classify_intent(state: AgentState) -> dict:
+    q = state.get("question", "")
+    last_id = state.get("last_record_id")
+    rid = normalize_record_id(q)
+    if not rid and last_id and (REFERS_BACK.search(q) or STATUS_WORDS.search(q)):
+        rid = last_id
+    if rid:
+        route = "appointment_status"
+    elif EXPLICIT_STATUS.search(q) and not rid:
+        route = "clarify"
+    else:
+        route = "rag"
+    _log("classify_intent", f"route={route} record_id={rid}")
+    return {"route": route, "record_id": rid, "node_log": ["classify_intent"]}
