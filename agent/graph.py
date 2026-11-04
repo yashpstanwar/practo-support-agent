@@ -1,4 +1,4 @@
-"""Task 7 - LangGraph support agent with intent classifier.
+"""Task 7 - LangGraph support agent with conditional edge.
 """
 from __future__ import annotations
 
@@ -7,6 +7,9 @@ import os
 import re
 import uuid
 from typing import Annotated, Any, Optional, TypedDict
+
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph import END, START, StateGraph
 
 import config
 from agent import memory as mem
@@ -89,3 +92,8 @@ async def classify_intent(state: AgentState) -> dict:
         route = "rag"
     _log("classify_intent", f"route={route} record_id={rid}")
     return {"route": route, "record_id": rid, "node_log": ["classify_intent"]}
+
+
+def route_intent(state: AgentState) -> str:
+    r = state.get("route", "rag")
+    return r if r in {"rag", "appointment_status", "blocked", "clarify"} else "rag"
