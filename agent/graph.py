@@ -1,4 +1,4 @@
-"""Task 7 - LangGraph support agent with conditional edge.
+"""Task 7 - LangGraph support agent with RAG node.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from langgraph.graph import END, START, StateGraph
 
 import config
 from agent import memory as mem
+from rag.generate import IDK_ANSWER, grounded_answer
 from tools import normalize_record_id
 
 VERBOSE = os.getenv("AGENT_VERBOSE", "1") == "1"
@@ -97,3 +98,14 @@ async def classify_intent(state: AgentState) -> dict:
 def route_intent(state: AgentState) -> str:
     r = state.get("route", "rag")
     return r if r in {"rag", "appointment_status", "blocked", "clarify"} else "rag"
+
+
+async def rag_tool(state: AgentState, config_: RunnableConfig | None = None) -> dict:
+    res = grounded_answer(state.get("question", ""))
+    _log("rag_tool", f"top1={res['top1']:.3f} hits={len(res['hits'])} draft={res['answer'][:60]}...")
+    return {
+        "hits": res["hits"],
+        "top1": res["top1"],
+        "draft_answer": res["answer"],
+        "node_log": ["rag_tool"],
+    }
