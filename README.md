@@ -210,3 +210,27 @@ escalate if escalation_score >= 0.80
   it is older than the median appointment; a record without follow-up scores at most
   0.40 and never escalates on age alone. In this dataset **4 / 60 records (6.7 %)**
   escalate (`APT-1002`, `APT-1025`, `APT-1044`, `APT-1047`) — a manageable queue.
+
+### Task 7 — the graph
+
+```
+START → load_memory → input_guard → classify_intent ──(conditional edge)──┬─ rag_tool ─────┐
+                                                                         ├─ status_tool ──┤
+                                                                         ├─ blocked ──────┤
+                                                                         └─ clarify ──────┤
+                     END ← save_memory ← format_response ← output_guard ←─────────────────┘
+```
+
+10 nodes. `classify_intent` routes on intent: a message containing an appointment ID
+(`APT-XXXX`), or a status/fee question that refers back to the appointment in memory
+("what is the fee for **it**?"), goes to `status_tool`; injection attempts go to
+`blocked`; status questions without any ID go to `clarify`; everything else goes to
+`rag_tool`. Transcript 07 shows both tool routes firing.
+
+### Task 8 — persisted memory
+
+`memory_store/<thread_id>.json` stores every turn (masked user text, answer, route) and
+`last_record_id`. Transcript 07 has **two separate transcripts**: a 4-turn conversation
+where turns 2–3 never mention the ID but are answered about `APT-1022` from memory, and
+a fresh thread where the same question finds no state, starts at turn 1, and is asked
+for an appointment ID.

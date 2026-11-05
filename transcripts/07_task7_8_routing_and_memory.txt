@@ -1,0 +1,167 @@
+$ MOCK_LLM=1 python -m demos.demo_routing_memory
+
+MOCK_LLM=True
+==============================================================================
+PART A - conditional edge routes to BOTH tools
+==============================================================================
+
+USER [routing-demo]: How much does a cardiology consultation cost?
+    [node:load_memory] thread=routing-demo prior_turns=0 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=rag
+    [node:rag_tool] top1=0.837 fallback=False docs=['03_consultation_fees', '03_consultation_fees', '03_consultation_fees']
+    [node:output_guard] grounded=True reason=all_sentences_supported
+    [node:output_guard]   support sim=1.000 supported=True | Cardiology consultations are the most expensive, ranging from 800 to 1
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 1 turn(s), last_record_id=None -> routing-demo.json
+AGENT route=rag  turn=1  (schema: VALID)
+  answer: Cardiology consultations are the most expensive, ranging from 800 to 1500 rupees, and every fee includes GST.
+  sources: ['03_consultation_fees::sent::3', '03_consultation_fees::sent::1', '03_consultation_fees::sent::2']
+
+USER [routing-demo]: Can you check the status of appointment APT-1007?
+    [node:load_memory] thread=routing-demo prior_turns=1 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1007
+    [node:status_tool] attempt 1 at t=2266.64: success, found=True
+    [node:output_guard] answer built from tool result -> grounded
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 2 turn(s), last_record_id=APT-1007 -> routing-demo.json
+AGENT route=appointment_status  turn=2  (schema: VALID)
+  answer: Appointment APT-1007 (Orthopedics) is currently Scheduled. The consultation fee is INR 1100. No follow-up visit is required. Escalation score 0.32 (threshold 0.80): no escalation needed.
+  appointment: {"record_id": "APT-1007", "found": true, "status": "Scheduled", "consultation_fee_inr": 1100, "escalation_score": 0.32, "escalate": false}
+
+OK: query 1 -> rag_tool, query 2 -> status_tool
+
+==============================================================================
+PART B - TRANSCRIPT 1: multi-turn conversation, state carried via memory_store/patient-42.json
+==============================================================================
+
+USER [patient-42]: Hi, please check my appointment APT-1022.
+    [node:load_memory] thread=patient-42 prior_turns=0 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1022
+    [node:status_tool] attempt 1 at t=2266.65: success, found=True
+    [node:output_guard] answer built from tool result -> grounded
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 1 turn(s), last_record_id=APT-1022 -> patient-42.json
+AGENT route=appointment_status  turn=1  (schema: VALID)
+  answer: Appointment APT-1022 (Pediatrics) is currently Scheduled. The consultation fee is INR 600. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.
+  appointment: {"record_id": "APT-1022", "found": true, "status": "Scheduled", "consultation_fee_inr": 600, "escalation_score": 0.7733, "escalate": false}
+
+USER [patient-42]: What is the fee for it?
+    [node:load_memory] thread=patient-42 prior_turns=1 last_record_id=APT-1022
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1022
+    [node:status_tool] attempt 1 at t=2266.65: success, found=True
+    [node:output_guard] answer built from tool result -> grounded
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 2 turn(s), last_record_id=APT-1022 -> patient-42.json
+AGENT route=appointment_status  turn=2  (schema: VALID)
+  answer: The consultation fee is INR 600. Appointment APT-1022 (Pediatrics) is currently Scheduled. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.
+  appointment: {"record_id": "APT-1022", "found": true, "status": "Scheduled", "consultation_fee_inr": 600, "escalation_score": 0.7733, "escalate": false}
+
+USER [patient-42]: Does it need a follow-up, and is it escalated?
+    [node:load_memory] thread=patient-42 prior_turns=2 last_record_id=APT-1022
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1022
+    [node:status_tool] attempt 1 at t=2266.65: success, found=True
+    [node:output_guard] answer built from tool result -> grounded
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 3 turn(s), last_record_id=APT-1022 -> patient-42.json
+AGENT route=appointment_status  turn=3  (schema: VALID)
+  answer: Appointment APT-1022 (Pediatrics) is currently Scheduled. The consultation fee is INR 600. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.
+  appointment: {"record_id": "APT-1022", "found": true, "status": "Scheduled", "consultation_fee_inr": 600, "escalation_score": 0.7733, "escalate": false}
+
+USER [patient-42]: What is the discount on a follow-up visit?
+    [node:load_memory] thread=patient-42 prior_turns=3 last_record_id=APT-1022
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=rag
+    [node:rag_tool] top1=0.784 fallback=False docs=['10_follow_up_discount', '10_follow_up_discount', '10_follow_up_discount']
+    [node:output_guard] grounded=True reason=all_sentences_supported
+    [node:output_guard]   support sim=1.000 supported=True | The discount applies only when the doctor has marked the original appo
+    [node:output_guard]   support sim=1.000 supported=True | A follow-up booked between 8 and 14 days after the original consultati
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 4 turn(s), last_record_id=APT-1022 -> patient-42.json
+AGENT route=rag  turn=4  (schema: VALID)
+  answer: The discount applies only when the doctor has marked the original appointment as needing a follow-up. A follow-up booked between 8 and 14 days after the original consultation receives a 50 percent discount on the consultation fee.
+  sources: ['10_follow_up_discount::sent::1', '10_follow_up_discount::sent::2', '10_follow_up_discount::sent::3']
+
+Persisted memory file memory_store/patient-42.json:
+{
+  "thread_id": "patient-42",
+  "turns": [
+    {
+      "turn": 1,
+      "user": "Hi, please check my appointment APT-1022.",
+      "assistant": "Appointment APT-1022 (Pediatrics) is currently Scheduled. The consultation fee is INR 600. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.",
+      "route": "appointment_status"
+    },
+    {
+      "turn": 2,
+      "user": "What is the fee for it?",
+      "assistant": "The consultation fee is INR 600. Appointment APT-1022 (Pediatrics) is currently Scheduled. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.",
+      "route": "appointment_status"
+    },
+    {
+      "turn": 3,
+      "user": "Does it need a follow-up, and is it escalated?",
+      "assistant": "Appointment APT-1022 (Pediatrics) is currently Scheduled. The consultation fee is INR 600. A follow-up visit is required. Escalation score 0.77 (threshold 0.80): no escalation needed.",
+      "route": "appointment_status"
+    },
+    {
+      "turn": 4,
+      "user": "What is the discount on a follow-up visit?",
+      "assistant": "The discount applies only when the doctor has marked the original appointment as needing a follow-up. A follow-up booked between 8 and 14 days after the original consultation receives a 50 percent discount on the consultation fee.",
+      "route": "rag"
+    }
+  ],
+  "last_record_id": "APT-1022"
+}
+OK: turns 2 and 3 never mention an ID - APT-1022 was carried over from turn 1 via persisted memory
+
+==============================================================================
+PART C - TRANSCRIPT 2: fresh conversation (new thread) - memory correctly absent
+==============================================================================
+
+USER [patient-77]: What is the fee for it?
+    [node:load_memory] thread=patient-77 prior_turns=0 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=clarify
+    [node:clarify] no appointment ID in message or memory
+    [node:output_guard] pass-through (missing_record_id)
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 1 turn(s), last_record_id=None -> patient-77.json
+AGENT route=clarify  turn=1  (schema: VALID)
+  answer: Please share your appointment ID (format APT-XXXX) so I can check its status.
+
+USER [patient-77]: What's my appointment status?
+    [node:load_memory] thread=patient-77 prior_turns=1 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=clarify
+    [node:clarify] no appointment ID in message or memory
+    [node:output_guard] pass-through (missing_record_id)
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 2 turn(s), last_record_id=None -> patient-77.json
+AGENT route=clarify  turn=2  (schema: VALID)
+  answer: Please share your appointment ID (format APT-XXXX) so I can check its status.
+
+Persisted memory file memory_store/patient-77.json:
+{
+  "thread_id": "patient-77",
+  "turns": [
+    {
+      "turn": 1,
+      "user": "What is the fee for it?",
+      "assistant": "Please share your appointment ID (format APT-XXXX) so I can check its status.",
+      "route": "clarify"
+    },
+    {
+      "turn": 2,
+      "user": "What's my appointment status?",
+      "assistant": "Please share your appointment ID (format APT-XXXX) so I can check its status.",
+      "route": "clarify"
+    }
+  ],
+  "last_record_id": null
+}
+OK: new thread starts at turn 1 with last_record_id=None; the agent does NOT know APT-1022 and asks for an ID instead.
