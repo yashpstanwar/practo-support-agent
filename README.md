@@ -234,3 +234,11 @@ START → load_memory → input_guard → classify_intent ──(conditional edg
 where turns 2–3 never mention the ID but are answered about `APT-1022` from memory, and
 a fresh thread where the same question finds no state, starts at turn 1, and is asked
 for an appointment ID.
+
+### Task 9 — structured output
+
+`agent/schema.py` defines a JSON Schema (draft 2020-12, `additionalProperties: false`)
+for every response: `trace_id, thread_id, turn, route, answer, sources[], appointment,
+guardrails{pii_masked, injection_detected, grounded, reason}, mock_llm`. The
+`format_response` node validates every response with `jsonschema` and raises on any
+violation; the demos re-validate and a negative test shows a malformed response being rejected.

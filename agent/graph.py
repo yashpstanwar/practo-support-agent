@@ -1,4 +1,4 @@
-"""Task 7 - LangGraph support agent with status tool node.
+"""Task 7 - LangGraph support agent with format_response node.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from langgraph.graph import END, START, StateGraph
 
 import config
 from agent import memory as mem
+from agent.schema import validate_response
 from rag.generate import IDK_ANSWER, grounded_answer
 from tools import check_appointment_status, normalize_record_id
 
@@ -141,3 +142,43 @@ async def status_tool(state: AgentState, config_: RunnableConfig | None = None) 
 async def clarify(state: AgentState) -> dict:
     _log("clarify", "asking for appointment ID")
     return {"draft_answer": CLARIFY_ANSWER, "node_log": ["clarify"]}
+
+
+async def format_response(state: AgentState) -> dict:
+    hits = state.get("hits") or []
+    sources = [
+        {"doc_id": h["doc_id"], "chunk_id": h["chunk_id"], "score": round(float(h["score"]), 3)}
+        for h in hits
+    ]
+    ans = state.get("answer") or state.get("draft_answer") or ""
+    app = state.get("appointment")
+    appointment_out = None
+    if app:
+        appointment_out = {
+            "record_id": app["record_id"],
+            "found": app["found"],
+            "status": app.get("status"),
+            "consultation_fee_inr": app.get("consultation_fee_inr"),
+            "escalation_score": app.get("escalation_score"),
+            "escalate": app.get("escalate"),
+        }
+    pii = state.get("pii") or {}
+    resp = {
+        "trace_id": state["trace_id"],
+        "thread_id": state["thread_id"],
+        "turn": state.get("turn", 1),
+        "route": state.get("route", "rag"),
+        "answer": ans,
+        "sources": sources,
+        "appointment": appointment_out,
+        "guardrails": {
+            "pii_masked": bool(pii.get("pii_masked", False)),
+            "injection_detected": bool(state.get("injection", False)),
+            "grounded": state.get("grounded"),
+            "reason": state.get("guard_reason"),
+        },
+        "mock_llm": config.MOCK_LLM,
+    }
+    validate_response(resp)
+    _log("format_response", f"valid response, answer len={len(ans)}")
+    return {"answer": ans, "response": resp, "node_log": ["format_response"]}
