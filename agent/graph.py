@@ -1,4 +1,4 @@
-"""Task 7 - LangGraph support agent with RAG node.
+"""Task 7 - LangGraph support agent with status tool node.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from langgraph.graph import END, START, StateGraph
 import config
 from agent import memory as mem
 from rag.generate import IDK_ANSWER, grounded_answer
-from tools import normalize_record_id
+from tools import check_appointment_status, normalize_record_id
 
 VERBOSE = os.getenv("AGENT_VERBOSE", "1") == "1"
 
@@ -22,6 +22,7 @@ STATUS_WORDS = re.compile(r"\b(status|fee|cost|charge|escalat\w*|follow[- ]?up|c
 REFERS_BACK = re.compile(r"\b(its|for it|is it|does it|that one|this one|that appointment|this appointment|"
                          r"same appointment|my appointment|that booking|my booking)\b", re.I)
 EXPLICIT_STATUS = re.compile(r"\b(status of|check (my|the) (appointment|booking)|appointment status|booking status)\b", re.I)
+CLARIFY_ANSWER = "Please share your appointment ID (format APT-XXXX) so I can check its status."
 
 
 class AgentState(TypedDict, total=False):
@@ -109,3 +110,34 @@ async def rag_tool(state: AgentState, config_: RunnableConfig | None = None) -> 
         "draft_answer": res["answer"],
         "node_log": ["rag_tool"],
     }
+
+
+async def status_tool(state: AgentState, config_: RunnableConfig | None = None) -> dict:
+    rid = state.get("record_id") or ""
+    info = check_appointment_status(rid)
+    if not info.get("found"):
+        ans = f"I couldn't find an appointment with ID {rid}. Please check the ID."
+    else:
+        parts = [
+            f"Appointment {info['record_id']} ({info['category']}) is currently {info['status']}.",
+            f"Consultation fee: INR {info['consultation_fee_inr']}.",
+            f"Created {info['days_since_created']} day(s) ago; follow-up required: "
+            f"{'yes' if info['follow_up_required'] else 'no'}."
+        ]
+        if info["escalate"]:
+            parts.append(
+                f"Attention: This appointment has an escalation score of {info['escalation_score']} "
+                f"(>= {info['escalation_threshold']}). A patient-experience specialist has been notified."
+            )
+        ans = " ".join(parts)
+    _log("status_tool", f"record={rid} escalate={info.get('escalate')} ans={ans[:60]}...")
+    return {
+        "appointment": info,
+        "draft_answer": ans,
+        "node_log": ["status_tool"],
+    }
+
+
+async def clarify(state: AgentState) -> dict:
+    _log("clarify", "asking for appointment ID")
+    return {"draft_answer": CLARIFY_ANSWER, "node_log": ["clarify"]}
