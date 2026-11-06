@@ -1,10 +1,17 @@
-"""Task 7 - LangGraph support agent with format_response node.
+"""Task 7 (+8, 9, 10) - the LangGraph support agent.
+
+Nodes (10):
+  load_memory -> input_guard -> classify_intent --(conditional edge)--> one of
+      rag_tool | status_tool | blocked | clarify
+  -> output_guard -> format_response -> save_memory -> END
 """
 from __future__ import annotations
 
+import asyncio
 import operator
 import os
 import re
+import time
 import uuid
 from typing import Annotated, Any, Optional, TypedDict
 
@@ -14,16 +21,22 @@ from langgraph.graph import END, START, StateGraph
 import config
 from agent import memory as mem
 from agent.schema import validate_response
+from guardrails import check_groundedness, detect_injection, mask_pii
 from rag.generate import IDK_ANSWER, grounded_answer
-from tools import check_appointment_status, normalize_record_id
+from tools import TransientBackendError, check_appointment_status, normalize_record_id
 
 VERBOSE = os.getenv("AGENT_VERBOSE", "1") == "1"
+
+REFUSAL_UNGROUNDED = ("I can't answer that reliably from the clinic policy knowledge base, "
+                      "so I won't guess. Please contact Practo support for help.")
+BLOCKED_ANSWER = ("I can't help with that request. I can answer clinic-policy questions or "
+                  "check an appointment by its ID (for example APT-1007).")
+CLARIFY_ANSWER = "Please share your appointment ID (format APT-XXXX) so I can check its status."
 
 STATUS_WORDS = re.compile(r"\b(status|fee|cost|charge|escalat\w*|follow[- ]?up|confirmed|scheduled|cancelled)\b", re.I)
 REFERS_BACK = re.compile(r"\b(its|for it|is it|does it|that one|this one|that appointment|this appointment|"
                          r"same appointment|my appointment|that booking|my booking)\b", re.I)
 EXPLICIT_STATUS = re.compile(r"\b(status of|check (my|the) (appointment|booking)|appointment status|booking status)\b", re.I)
-CLARIFY_ANSWER = "Please share your appointment ID (format APT-XXXX) so I can check its status."
 
 
 class AgentState(TypedDict, total=False):
@@ -49,136 +62,215 @@ class AgentState(TypedDict, total=False):
     node_log: Annotated[list, operator.add]
 
 
+_FLAKY_CALLS: dict[str, int] = {}
+
+
 def _log(node: str, msg: str = "") -> None:
     if VERBOSE:
         print(f"    [node:{node}] {msg}".rstrip(), flush=True)
 
 
-async def load_memory(state: AgentState) -> dict:
-    tid = state.get("thread_id") or "default"
-    rec = mem.load(tid)
-    trace = state.get("trace_id") or uuid.uuid4().hex
-    _log("load_memory", f"thread_id={tid} existing_turns={len(rec['turns'])} last_id={rec['last_record_id']}")
-    return {
-        "thread_id": tid,
-        "trace_id": trace,
-        "turn": len(rec["turns"]) + 1,
-        "history": rec["turns"],
-        "last_record_id": rec["last_record_id"],
-        "node_log": ["load_memory"],
-    }
+def _cfg(config_: RunnableConfig | None) -> dict:
+    return (config_ or {}).get("configurable", {}) or {}
 
 
-async def save_memory(state: AgentState) -> dict:
-    tid = state["thread_id"]
-    ans = state.get("answer", "")
-    route = state.get("route", "")
-    q = state.get("question", "")
-    rec_id = state.get("record_id") or state.get("last_record_id")
-    turns = list(state.get("history", [])) + [{"turn": state.get("turn", 1), "user": q, "assistant": ans, "route": route}]
-    mem.save(tid, {"thread_id": tid, "turns": turns, "last_record_id": rec_id})
-    _log("save_memory", f"saved turn={state.get('turn')} last_record_id={rec_id}")
-    return {"node_log": ["save_memory"]}
+async def _maybe_delay(node: str, config_: RunnableConfig | None) -> None:
+    d = _cfg(config_).get("simulate_delay", {}).get(node)
+    if d:
+        _log(node, f"simulated slow call: sleeping {d}s")
+        await asyncio.sleep(d)
 
 
-async def classify_intent(state: AgentState) -> dict:
-    q = state.get("question", "")
-    last_id = state.get("last_record_id")
+async def load_memory(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("load_memory", config)
+    m = mem.load(state["thread_id"])
+    _log("load_memory", f"thread={state['thread_id']} prior_turns={len(m['turns'])} "
+                        f"last_record_id={m['last_record_id']}")
+    return {"history": m["turns"], "last_record_id": m["last_record_id"],
+            "turn": len(m["turns"]) + 1, "node_log": ["load_memory"]}
+
+
+async def input_guard(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("input_guard", config)
+    masked, pii = mask_pii(state["question"])
+    inj, match = detect_injection(masked)
+    _log("input_guard", f"pii_masked={pii['pii_masked']} injection={inj}"
+                        + (f" match='{match}'" if match else ""))
+    return {"question": masked, "pii": pii, "injection": inj, "injection_match": match,
+            "node_log": ["input_guard"]}
+
+
+async def classify_intent(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("classify_intent", config)
+    q = state["question"]
     rid = normalize_record_id(q)
-    if not rid and last_id and (REFERS_BACK.search(q) or STATUS_WORDS.search(q)):
-        rid = last_id
-    if rid:
+    if state.get("injection"):
+        route = "blocked"
+    elif rid:
         route = "appointment_status"
-    elif EXPLICIT_STATUS.search(q) and not rid:
+    elif state.get("last_record_id") and STATUS_WORDS.search(q) and REFERS_BACK.search(q):
+        route, rid = "appointment_status", state["last_record_id"]
+    elif EXPLICIT_STATUS.search(q) or (STATUS_WORDS.search(q) and REFERS_BACK.search(q)):
         route = "clarify"
     else:
         route = "rag"
-    _log("classify_intent", f"route={route} record_id={rid}")
+    _log("classify_intent", f"route={route}" + (f" record_id={rid}" if rid else ""))
     return {"route": route, "record_id": rid, "node_log": ["classify_intent"]}
 
 
-def route_intent(state: AgentState) -> str:
-    r = state.get("route", "rag")
-    return r if r in {"rag", "appointment_status", "blocked", "clarify"} else "rag"
+def route_by_intent(state: AgentState) -> str:
+    return {"rag": "rag_tool", "appointment_status": "status_tool",
+            "blocked": "blocked", "clarify": "clarify"}[state["route"]]
 
 
-async def rag_tool(state: AgentState, config_: RunnableConfig | None = None) -> dict:
-    res = grounded_answer(state.get("question", ""))
-    _log("rag_tool", f"top1={res['top1']:.3f} hits={len(res['hits'])} draft={res['answer'][:60]}...")
-    return {
-        "hits": res["hits"],
-        "top1": res["top1"],
-        "draft_answer": res["answer"],
-        "node_log": ["rag_tool"],
-    }
+async def rag_tool(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("rag_tool", config)
+    r = await asyncio.to_thread(grounded_answer, state["question"])
+    draft = _cfg(config).get("force_draft_answer") or r["answer"]
+    hits = [{"doc_id": h.doc_id, "chunk_id": h.chunk_id, "score": h.score, "text": h.text} for h in r["hits"]]
+    _log("rag_tool", f"top1={r['top1']:.3f} fallback={r['fallback']} docs={[h['doc_id'] for h in hits]}")
+    return {"hits": hits, "top1": r["top1"], "draft_answer": draft, "appointment": None,
+            "node_log": ["rag_tool"]}
 
 
-async def status_tool(state: AgentState, config_: RunnableConfig | None = None) -> dict:
-    rid = state.get("record_id") or ""
-    info = check_appointment_status(rid)
-    if not info.get("found"):
-        ans = f"I couldn't find an appointment with ID {rid}. Please check the ID."
+async def status_tool(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("status_tool", config)
+    rec = check_appointment_status(state["record_id"])
+    if not rec["found"]:
+        draft = f"I couldn't find an appointment with ID {rec['record_id']}. Please check the ID and try again."
     else:
-        parts = [
-            f"Appointment {info['record_id']} ({info['category']}) is currently {info['status']}.",
-            f"Consultation fee: INR {info['consultation_fee_inr']}.",
-            f"Created {info['days_since_created']} day(s) ago; follow-up required: "
-            f"{'yes' if info['follow_up_required'] else 'no'}."
-        ]
-        if info["escalate"]:
-            parts.append(
-                f"Attention: This appointment has an escalation score of {info['escalation_score']} "
-                f"(>= {info['escalation_threshold']}). A patient-experience specialist has been notified."
-            )
-        ans = " ".join(parts)
-    _log("status_tool", f"record={rid} escalate={info.get('escalate')} ans={ans[:60]}...")
-    return {
-        "appointment": info,
-        "draft_answer": ans,
-        "node_log": ["status_tool"],
-    }
+        q = state["question"].lower()
+        fee = f"The consultation fee is INR {rec['consultation_fee_inr']}."
+        status = f"Appointment {rec['record_id']} ({rec['category']}) is currently {rec['status']}."
+        fu = "A follow-up visit is required." if rec["follow_up_required"] else "No follow-up visit is required."
+        esc = (f"Escalation score {rec['escalation_score']:.2f} (threshold {rec['escalation_threshold']:.2f}): "
+               + ("escalated to the patient-experience team." if rec["escalate"] else "no escalation needed."))
+        parts = [fee, status, fu, esc] if re.search(r"\b(fee|cost|charge)\b", q) else [status, fee, fu, esc]
+        draft = " ".join(parts)
+    _log("status_tool", f"success, found={rec['found']}")
+    return {"appointment": rec, "draft_answer": draft, "hits": [], "top1": 1.0,
+            "node_log": ["status_tool"]}
 
 
-async def clarify(state: AgentState) -> dict:
-    _log("clarify", "asking for appointment ID")
-    return {"draft_answer": CLARIFY_ANSWER, "node_log": ["clarify"]}
+async def blocked(state: AgentState, config: RunnableConfig) -> dict:
+    _log("blocked", f"prompt injection blocked: '{state.get('injection_match')}'")
+    return {"draft_answer": BLOCKED_ANSWER, "hits": [], "appointment": None, "node_log": ["blocked"]}
 
 
-async def format_response(state: AgentState) -> dict:
-    hits = state.get("hits") or []
-    sources = [
-        {"doc_id": h["doc_id"], "chunk_id": h["chunk_id"], "score": round(float(h["score"]), 3)}
-        for h in hits
-    ]
-    ans = state.get("answer") or state.get("draft_answer") or ""
-    app = state.get("appointment")
-    appointment_out = None
-    if app:
-        appointment_out = {
-            "record_id": app["record_id"],
-            "found": app["found"],
-            "status": app.get("status"),
-            "consultation_fee_inr": app.get("consultation_fee_inr"),
-            "escalation_score": app.get("escalation_score"),
-            "escalate": app.get("escalate"),
-        }
-    pii = state.get("pii") or {}
+async def clarify(state: AgentState, config: RunnableConfig) -> dict:
+    _log("clarify", "no appointment ID in message or memory")
+    return {"draft_answer": CLARIFY_ANSWER, "hits": [], "appointment": None, "node_log": ["clarify"]}
+
+
+async def output_guard(state: AgentState, config: RunnableConfig) -> dict:
+    await _maybe_delay("output_guard", config)
+    route = state["route"]
+    if route == "rag":
+        g = await asyncio.to_thread(check_groundedness, state["draft_answer"],
+                                    [h["text"] for h in state["hits"]], state["top1"])
+        if g["grounded"]:
+            answer = state["draft_answer"]
+        elif g["reason"].startswith("retrieval_below_threshold"):
+            answer = IDK_ANSWER
+        else:
+            answer = REFUSAL_UNGROUNDED
+        _log("output_guard", f"grounded={g['grounded']} reason={g['reason']}")
+        return {"answer": answer, "grounded": g["grounded"], "guard_reason": g["reason"],
+                "node_log": ["output_guard"]}
+    if route == "appointment_status":
+        _log("output_guard", "answer built from tool result -> grounded")
+        return {"answer": state["draft_answer"], "grounded": True, "guard_reason": "tool_result",
+                "node_log": ["output_guard"]}
+    reason = f"prompt_injection: {state.get('injection_match')}" if route == "blocked" else "missing_record_id"
+    _log("output_guard", f"pass-through ({reason})")
+    return {"answer": state["draft_answer"], "grounded": None, "guard_reason": reason,
+            "node_log": ["output_guard"]}
+
+
+async def format_response(state: AgentState, config: RunnableConfig) -> dict:
+    appt = state.get("appointment")
+    if appt is not None:
+        appt = {k: appt[k] for k in ("record_id", "found", "status", "consultation_fee_inr",
+                                     "escalation_score", "escalate") if k in appt}
     resp = {
         "trace_id": state["trace_id"],
         "thread_id": state["thread_id"],
-        "turn": state.get("turn", 1),
-        "route": state.get("route", "rag"),
-        "answer": ans,
-        "sources": sources,
-        "appointment": appointment_out,
-        "guardrails": {
-            "pii_masked": bool(pii.get("pii_masked", False)),
-            "injection_detected": bool(state.get("injection", False)),
-            "grounded": state.get("grounded"),
-            "reason": state.get("guard_reason"),
-        },
-        "mock_llm": config.MOCK_LLM,
+        "turn": state["turn"],
+        "route": state["route"],
+        "answer": state["answer"],
+        "sources": [{"doc_id": h["doc_id"], "chunk_id": h["chunk_id"], "score": float(h["score"])}
+                    for h in state.get("hits", [])],
+        "appointment": appt,
+        "guardrails": {"pii_masked": bool(state["pii"]["pii_masked"]),
+                       "injection_detected": bool(state.get("injection")),
+                       "grounded": state.get("grounded"),
+                       "reason": state.get("guard_reason")},
+        "mock_llm": bool(config.MOCK_LLM),
     }
     validate_response(resp)
-    _log("format_response", f"valid response, answer len={len(ans)}")
-    return {"answer": ans, "response": resp, "node_log": ["format_response"]}
+    _log("format_response", "response validated against RESPONSE_SCHEMA")
+    return {"response": resp, "node_log": ["format_response"]}
+
+
+async def save_memory(state: AgentState, config: RunnableConfig) -> dict:
+    turns = list(state.get("history", [])) + [
+        {"turn": state["turn"], "user": state["question"], "assistant": state["answer"],
+         "route": state["route"]}]
+    last = state.get("last_record_id")
+    appt = state.get("appointment")
+    if appt and appt.get("found"):
+        last = appt["record_id"]
+    path = mem.save(state["thread_id"], {"thread_id": state["thread_id"], "turns": turns,
+                                         "last_record_id": last})
+    _log("save_memory", f"saved {len(turns)} turn(s), last_record_id={last} -> {path.name}")
+    return {"last_record_id": last, "node_log": ["save_memory"]}
+
+
+def build_graph():
+    g = StateGraph(AgentState)
+    g.add_node("load_memory", load_memory)
+    g.add_node("input_guard", input_guard)
+    g.add_node("classify_intent", classify_intent)
+    g.add_node("rag_tool", rag_tool)
+    g.add_node("status_tool", status_tool)
+    g.add_node("blocked", blocked)
+    g.add_node("clarify", clarify)
+    g.add_node("output_guard", output_guard)
+    g.add_node("format_response", format_response)
+    g.add_node("save_memory", save_memory)
+
+    g.add_edge(START, "load_memory")
+    g.add_edge("load_memory", "input_guard")
+    g.add_edge("input_guard", "classify_intent")
+    g.add_conditional_edges("classify_intent", route_by_intent,
+                            ["rag_tool", "status_tool", "blocked", "clarify"])
+    for n in ("rag_tool", "status_tool", "blocked", "clarify"):
+        g.add_edge(n, "output_guard")
+    g.add_edge("output_guard", "format_response")
+    g.add_edge("format_response", "save_memory")
+    g.add_edge("save_memory", END)
+    return g.compile()
+
+
+_DEFAULT_GRAPH = None
+
+
+def default_graph():
+    global _DEFAULT_GRAPH
+    if _DEFAULT_GRAPH is None:
+        _DEFAULT_GRAPH = build_graph()
+    return _DEFAULT_GRAPH
+
+
+async def arun_agent(question: str, thread_id: str = "default", *, trace_id: str | None = None,
+                     simulate: dict | None = None, graph=None) -> dict:
+    trace_id = trace_id or uuid.uuid4().hex
+    graph = graph or default_graph()
+    inputs = {"thread_id": thread_id, "trace_id": trace_id, "question": question, "node_log": []}
+    cfg = {"configurable": {"thread_id": f"{thread_id}:{trace_id}", **(simulate or {})}}
+    state = await graph.ainvoke(inputs, cfg)
+    return state["response"]
+
+
+def run_agent(question: str, thread_id: str = "default", **kw) -> dict:
+    return asyncio.run(arun_agent(question, thread_id, **kw))

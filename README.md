@@ -242,3 +242,21 @@ for every response: `trace_id, thread_id, turn, route, answer, sources[], appoin
 guardrails{pii_masked, injection_detected, grounded, reason}, mock_llm`. The
 `format_response` node validates every response with `jsonschema` and raises on any
 violation; the demos re-validate and a negative test shows a malformed response being rejected.
+
+### Task 10 — guardrails (each demonstrated firing in transcript 08)
+
+* **PII masking (input)** — Indian mobile numbers, the fixed-format PII field
+  (`+91 98765 43210`, `09812345678`, `98765-43210`, …) → `[PHONE_MASKED]`; e-mails are
+  masked too. The masked text replaces the raw question inside the graph, so memory,
+  logs and the model only ever see the masked value. Patient name, diagnosis/condition
+  and insurance ID are free text with no universal format, so — as the brief states —
+  they are out of scope for a keyless regex masker; only fabricated examples are used.
+* **Prompt-injection detection (input)** — pattern detector (ignore/disregard previous
+  instructions, reveal system prompt, developer mode, dump all records, …); a hit routes
+  to the `blocked` node and no tool runs.
+* **Groundedness (output)** — `output_guard` refuses when (a) top-1 retrieval similarity
+  is below the calibrated threshold, or (b) any answer sentence is not supported by the
+  retrieved context (verbatim, or cosine ≥ 0.80 to a context sentence). Demonstrated with
+  an out-of-scope medical question and with a deliberately hallucinated draft answer.
+
+---
