@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 import config
 from agent.graph import GlobalTimeoutError, arun_agent
+from rag.chunking import Document
+from rag.store import index_documents
 
 app = FastAPI(title="Practo Domain Support Agent", version="1.0.0")
 
@@ -81,3 +83,14 @@ async def ask_endpoint(body: AskRequest, request: Request) -> AskResponse:
         raise HTTPException(status_code=504, detail="Agent run exceeded global timeout")
     request.state.route = res.get("route")
     return AskResponse(**res)
+
+
+@app.post("/add-document", response_model=AddDocumentResponse)
+def add_document_endpoint(body: AddDocumentRequest, request: Request) -> AddDocumentResponse:
+    trace_id = getattr(request.state, "trace_id", None) or uuid.uuid4().hex
+    doc = Document(doc_id=body.doc_id, title=body.title, text=body.text)
+    config.ADDED_DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    out = config.ADDED_DOCS_DIR / f"{body.doc_id}.md"
+    out.write_text(f"# {body.title}\n\n{body.text}\n", encoding="utf-8")
+    counts = index_documents([doc], persist_directory=config.CHROMA_DIR)
+    return AddDocumentResponse(trace_id=trace_id, doc_id=body.doc_id, chunks_indexed=counts)
