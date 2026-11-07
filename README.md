@@ -260,3 +260,93 @@ violation; the demos re-validate and a negative test shows a malformed response 
   an out-of-scope medical question and with a deliberately hallucinated draft answer.
 
 ---
+
+## Part 3 — Evaluation, observability & deployment
+
+* **Task 11** — `api.py`: `POST /ask` (`AskRequest` → `AskResponse`), `POST /add-document`
+  (`AddDocumentRequest` → `AddDocumentResponse`, chunks the new doc into **both**
+  collections), `GET /health`. Pydantic models throughout; empty questions return 422.
+* **Task 12** — an HTTP middleware writes exactly one JSON line per request to
+  `logs/requests.jsonl`: `ts, trace_id, method, path, status, latency_ms,
+  request_text (masked), pii_masked, route`. The request body is passed through the
+  same `mask_pii` as the agent, so the phone number in the demo is stored only as
+  `[PHONE_MASKED]` (the demo asserts the raw digits are absent from the log file).
+* **Task 13** — 15 test queries: one per required KB topic (12), two out-of-scope
+  (sports, medication dosing) and one edge case (`"refund?"`). The LLM-as-judge prompt is
+  in `evaluation/rag_triad.py`; under `MOCK_LLM` the same rubric is scored
+  deterministically (definitions in the file header).
+
+**Results (`transcripts/10_task13_rag_triad_eval.txt`, `evaluation/rag_triad_results.json`):**
+
+| # | Topic | Context relevance | Groundedness | Answer relevance |
+|---|---|---|---|---|
+| Q01 | appointment-booking policy | 1.000 | 1.000 | 0.658 |
+| Q02 | cancellation/rescheduling window | 1.000 | 1.000 | 0.596 |
+| Q03 | consultation-fee structure | 1.000 | 1.000 | 0.708 |
+| Q04 | insurance-claim process | 1.000 | 1.000 | 0.588 |
+| Q05 | prescription-refill policy | 1.000 | 1.000 | 0.717 |
+| Q06 | lab-test turnaround times | 1.000 | 1.000 | 0.661 |
+| Q07 | telemedicine eligibility | 1.000 | 1.000 | 0.672 |
+| Q08 | emergency-visit protocol | 0.333 | 1.000 | 0.502 |
+| Q09 | patient-data privacy policy | 1.000 | 1.000 | 0.812 |
+| Q10 | follow-up-visit discount policy | 1.000 | 1.000 | 0.800 |
+| Q11 | second-opinion process | 1.000 | 1.000 | 0.724 |
+| Q12 | home-visit eligibility | 1.000 | 1.000 | 0.707 |
+| Q13 | OUT-OF-SCOPE: "Who won the IPL in 2023?" | 0.000 | 1.000 | 1.000 |
+| Q14 | OUT-OF-SCOPE: paracetamol dose | 0.000 | 1.000 | 1.000 |
+| Q15 | EDGE: "refund?" | 0.000 | 1.000 | 0.000 |
+| | **Average (15 queries)** | **0.756** | **1.000** | **0.676** |
+
+Reading the numbers: groundedness is 1.000 by construction — the extractive mock
+generator can only emit retrieved sentences, and the output guard would block anything
+else. Both out-of-scope queries are correctly refused. The two weak spots are honest
+findings: Q08 (stroke) retrieves only one strongly relevant chunk because the emergency
+policy is a single sentence among unrelated ones, and the one-word edge case `"refund?"`
+scores 0.4265 — just under the 0.43 threshold — so the agent abstains rather than
+guessing which refund policy is meant (a real deployment would ask a clarifying question
+here). Q07 shows the extractive generator's limit: it answers with related telemedicine
+sentences rather than the exact "not suitable for chest pain" sentence.
+
+---
+
+## Part 4 — Resilience & interoperability
+
+* **Task 14 — MCP.** `mcp_server.py` wraps `check_appointment_status` (with a full
+  docstring that becomes the MCP tool description) using `fastmcp` and serves
+  streamable HTTP at **`http://127.0.0.1:8000/mcp`**. `mcp_client.py` is a separate
+  script/process that lists tools and calls the tool for `APT-1002`, `APT-1007` (and an
+  unknown `APT-9999`), printing the standardized MCP result (`content`, `structuredContent`, `isError`).
+* **Task 15 — SQLite checkpointing.** `AsyncSqliteSaver` from
+  `langgraph-checkpoint-sqlite`, database `checkpoints.sqlite`, keyed by
+  `thread_id="ckpt-demo-1"`. Phase 1 runs `load_memory → input_guard → classify_intent →
+  rag_tool` and is deliberately stopped with `interrupt_before=["output_guard"]`.
+  Phase 2 runs in a **new Python process**, prints the state loaded from the checkpoint
+  (retrieved chunks, draft answer, `node_log`) and resumes the same thread: only
+  `output_guard, format_response, save_memory` execute. `node_log` has an append
+  reducer, so a re-executed node would appear twice — it doesn't.
+* **Task 16 — timeouts and retries.**
+  * Retry policy on `status_tool` (LangGraph `RetryPolicy`): **max_attempts = 4,
+    initial_interval = 0.5 s, backoff_factor = 2.0, max_interval = 4.0 s, jitter = True**,
+    retrying only `TransientBackendError`. A simulated backend fails the first 2 calls
+    via a counter and succeeds on attempt 3; a control run with 5 failures gives up
+    cleanly after 4 attempts.
+  * Per-node timeout: `rag_tool` is added with `timeout=5.0` s; a simulated 30 s
+    vector-store call raises `langgraph.errors.NodeTimeoutError` after ~5 s.
+  * Global timeout: every run goes through `asyncio.wait_for(graph.ainvoke(...), 8.0)`;
+    three nodes taking 3 s each (9 s total) are cancelled at 8 s with
+    `GlobalTimeoutError`, and `save_memory` never runs.
+
+---
+
+## MOCK_LLM and the optional real LLM
+
+`MOCK_LLM=1` is the default and the only mode used for grading — no keys, no network for
+generation or judging. Setting `MOCK_LLM=0` with `OPENAI_API_KEY` sends the same
+grounded-generation prompt and judge prompts to a real model (`llm.py`); nothing in the
+acceptance criteria depends on it.
+
+## Notes
+
+* All patient data, phone numbers and policies are fabricated for this exercise.
+* `chroma_db/`, `memory_store/` and `checkpoints.sqlite` are generated at runtime and
+  git-ignored; `python run_all.py` recreates them.
