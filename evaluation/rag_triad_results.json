@@ -1,0 +1,129 @@
+{
+  "averages": {
+    "context_relevance": 0.7555,
+    "groundedness": 1.0,
+    "answer_relevance": 0.6763
+  },
+  "per_query": [
+    {
+      "q": "How many days in advance can I book an appointment?",
+      "topic": "appointment-booking policy",
+      "answer": "Patients can book an in-clinic or video appointment through the Practo app or website up to 30 days in advance.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.658
+    },
+    {
+      "q": "Will I lose money if I cancel two hours before my slot?",
+      "topic": "cancellation/rescheduling window",
+      "answer": "Cancellations made less than 4 hours before the slot forfeit 50 percent of the prepaid consultation fee. Appointments can be cancelled or rescheduled free of charge up to 4 hours before the scheduled slot.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.596
+    },
+    {
+      "q": "What is the consultation fee range for a pediatrician?",
+      "topic": "consultation-fee structure",
+      "answer": "General Medicine consultations cost between 300 and 600 rupees, and Pediatrics consultations cost between 400 and 800 rupees.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.708
+    },
+    {
+      "q": "How do I file an insurance claim for my lab tests?",
+      "topic": "insurance-claim process",
+      "answer": "Patients can claim reimbursement for consultations and lab tests if their health insurance policy covers outpatient care.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.588
+    },
+    {
+      "q": "Can I get my regular medicine refilled without seeing the doctor again?",
+      "topic": "prescription-refill policy",
+      "answer": "Repeat prescriptions for ongoing medication can be requested from the doctor who issued the original prescription. Refills are never issued for controlled or scheduled drugs, which always require a fresh consultation.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.717
+    },
+    {
+      "q": "How long do culture test reports take to come back?",
+      "topic": "lab-test turnaround times",
+      "answer": "Culture tests and histopathology reports can take up to 7 days.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.661
+    },
+    {
+      "q": "Is a video consultation allowed for chest pain?",
+      "topic": "telemedicine eligibility",
+      "answer": "A first consultation for Orthopedics or Cardiology must be in person, but later follow-ups may be done by video. Video consultations are available for General Medicine, Dermatology, Pediatrics and follow-up visits in other specialties.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.672
+    },
+    {
+      "q": "What should I do if someone has signs of a stroke?",
+      "topic": "emergency-visit protocol",
+      "answer": "If a patient has chest pain, severe bleeding, difficulty breathing, loss of consciousness or signs of a stroke, they must call 108 or go to the nearest hospital emergency department immediately.",
+      "context_relevance": 0.333,
+      "groundedness": 1.0,
+      "answer_relevance": 0.502
+    },
+    {
+      "q": "Can support agents see my diagnosis or clinical notes?",
+      "topic": "patient-data privacy policy",
+      "answer": "Support agents can see appointment status and fees but cannot see diagnoses or clinical notes.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.812
+    },
+    {
+      "q": "Is a follow-up within a week of my consultation free?",
+      "topic": "follow-up-visit discount policy",
+      "answer": "A follow-up visit with the same doctor within 7 days of the original consultation is free of charge. After 14 days, a follow-up is charged as a regular new consultation.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.8
+    },
+    {
+      "q": "How do I get a second opinion from another specialist?",
+      "topic": "second-opinion process",
+      "answer": "Patients can request a second opinion from another specialist in the same specialty through the Second Opinion option in the app.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.724
+    },
+    {
+      "q": "Who is eligible for a doctor's home visit?",
+      "topic": "home-visit eligibility",
+      "answer": "Home visits can be booked for General Medicine, Pediatrics and Orthopedics, as well as for home sample collection for lab tests. Home visits are available for patients above 65 years of age, bedridden patients and patients recovering from surgery within city limits.",
+      "context_relevance": 1.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.707
+    },
+    {
+      "q": "Who won the IPL in 2023?",
+      "topic": "OUT-OF-SCOPE (sports)",
+      "answer": "I don't know based on the clinic policy knowledge base.",
+      "context_relevance": 0.0,
+      "groundedness": 1.0,
+      "answer_relevance": 1.0
+    },
+    {
+      "q": "What dose of paracetamol should I take for a fever?",
+      "topic": "OUT-OF-SCOPE (medical advice)",
+      "answer": "I don't know based on the clinic policy knowledge base.",
+      "context_relevance": 0.0,
+      "groundedness": 1.0,
+      "answer_relevance": 1.0
+    },
+    {
+      "q": "refund?",
+      "topic": "EDGE CASE (one-word, ambiguous)",
+      "answer": "I don't know based on the clinic policy knowledge base.",
+      "context_relevance": 0.0,
+      "groundedness": 1.0,
+      "answer_relevance": 0.0
+    }
+  ]
+}

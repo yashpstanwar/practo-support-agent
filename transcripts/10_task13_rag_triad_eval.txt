@@ -1,0 +1,129 @@
+$ MOCK_LLM=1 python -m evaluation.rag_triad
+
+MOCK_LLM=True  collection=practo_kb_sentence  IDK_THRESHOLD=0.43
+15 queries; topics covered: 12 required KB topics + 2 out-of-scope + 1 edge case
+
+Sample judge prompt (query 1, context_relevance):
+You are an impartial evaluator of a retrieval-augmented support assistant.
+Metric: context_relevance
+Rubric: Fraction of retrieved passages that are relevant to the question.
+Question: How many days in advance can I book an appointment?
+Retrieved context:
+- Patients can book an in-clinic or video appointment through the Practo app or website up to 30 days in advance.
+- A patient may hold at most two upcoming bookings with the same doctor at any time.
+- Each booking is confirmed instantly by SMS and email with a unique appointment ID in the format APT-XXXX.
+Answer: Patients can book an in-clinic or video appointment through the Practo app or website up to 30 days in advance.
+Return JSON only: {"score": <float between 0 and 1>, "reason": "<one sentence>"}
+
+Q01 [appointment-booking policy] How many days in advance can I book an appointment?
+     answer: Patients can book an in-clinic or video appointment through the Practo app or website up to 30 days in advance.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.658  (cos(question, answer) = 0.658)
+
+Q02 [cancellation/rescheduling window] Will I lose money if I cancel two hours before my slot?
+     answer: Cancellations made less than 4 hours before the slot forfeit 50 percent of the prepaid consultation fee. Appointments can be cancelled or rescheduled 
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (2/2 answer sentences supported)
+     answer_relevance   0.596  (cos(question, answer) = 0.596)
+
+Q03 [consultation-fee structure] What is the consultation fee range for a pediatrician?
+     answer: General Medicine consultations cost between 300 and 600 rupees, and Pediatrics consultations cost between 400 and 800 rupees.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.708  (cos(question, answer) = 0.708)
+
+Q04 [insurance-claim process] How do I file an insurance claim for my lab tests?
+     answer: Patients can claim reimbursement for consultations and lab tests if their health insurance policy covers outpatient care.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.588  (cos(question, answer) = 0.588)
+
+Q05 [prescription-refill policy] Can I get my regular medicine refilled without seeing the doctor again?
+     answer: Repeat prescriptions for ongoing medication can be requested from the doctor who issued the original prescription. Refills are never issued for contro
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (2/2 answer sentences supported)
+     answer_relevance   0.717  (cos(question, answer) = 0.717)
+
+Q06 [lab-test turnaround times] How long do culture test reports take to come back?
+     answer: Culture tests and histopathology reports can take up to 7 days.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.661  (cos(question, answer) = 0.661)
+
+Q07 [telemedicine eligibility] Is a video consultation allowed for chest pain?
+     answer: A first consultation for Orthopedics or Cardiology must be in person, but later follow-ups may be done by video. Video consultations are available for
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (2/2 answer sentences supported)
+     answer_relevance   0.672  (cos(question, answer) = 0.672)
+
+Q08 [emergency-visit protocol] What should I do if someone has signs of a stroke?
+     answer: If a patient has chest pain, severe bleeding, difficulty breathing, loss of consciousness or signs of a stroke, they must call 108 or go to the neares
+     context_relevance  0.333  (1/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.502  (cos(question, answer) = 0.502)
+
+Q09 [patient-data privacy policy] Can support agents see my diagnosis or clinical notes?
+     answer: Support agents can see appointment status and fees but cannot see diagnoses or clinical notes.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.812  (cos(question, answer) = 0.812)
+
+Q10 [follow-up-visit discount policy] Is a follow-up within a week of my consultation free?
+     answer: A follow-up visit with the same doctor within 7 days of the original consultation is free of charge. After 14 days, a follow-up is charged as a regula
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (2/2 answer sentences supported)
+     answer_relevance   0.800  (cos(question, answer) = 0.800)
+
+Q11 [second-opinion process] How do I get a second opinion from another specialist?
+     answer: Patients can request a second opinion from another specialist in the same specialty through the Second Opinion option in the app.
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (1/1 answer sentences supported)
+     answer_relevance   0.724  (cos(question, answer) = 0.724)
+
+Q12 [home-visit eligibility] Who is eligible for a doctor's home visit?
+     answer: Home visits can be booked for General Medicine, Pediatrics and Orthopedics, as well as for home sample collection for lab tests. Home visits are avail
+     context_relevance  1.000  (3/3 chunks have cos >= 0.43)
+     groundedness       1.000  (2/2 answer sentences supported)
+     answer_relevance   0.707  (cos(question, answer) = 0.707)
+
+Q13 [OUT-OF-SCOPE (sports)] Who won the IPL in 2023?
+     answer: I don't know based on the clinic policy knowledge base.
+     context_relevance  0.000  (0/3 chunks have cos >= 0.43)
+     groundedness       1.000  (abstention - no claims to verify)
+     answer_relevance   1.000  (correct abstention on out-of-scope query)
+
+Q14 [OUT-OF-SCOPE (medical advice)] What dose of paracetamol should I take for a fever?
+     answer: I don't know based on the clinic policy knowledge base.
+     context_relevance  0.000  (0/3 chunks have cos >= 0.43)
+     groundedness       1.000  (abstention - no claims to verify)
+     answer_relevance   1.000  (correct abstention on out-of-scope query)
+
+Q15 [EDGE CASE (one-word, ambiguous)] refund?
+     answer: I don't know based on the clinic policy knowledge base.
+     context_relevance  0.000  (0/3 chunks have cos >= 0.43)
+     groundedness       1.000  (abstention - no claims to verify)
+     answer_relevance   0.000  (abstained on an in-scope query)
+
+================================================================================================
+#   topic                                 ctx_rel  grounded  ans_rel  route
+------------------------------------------------------------------------------------------------
+Q01 appointment-booking policy              1.000     1.000    0.658  rag
+Q02 cancellation/rescheduling window        1.000     1.000    0.596  rag
+Q03 consultation-fee structure              1.000     1.000    0.708  rag
+Q04 insurance-claim process                 1.000     1.000    0.588  rag
+Q05 prescription-refill policy              1.000     1.000    0.717  rag
+Q06 lab-test turnaround times               1.000     1.000    0.661  rag
+Q07 telemedicine eligibility                1.000     1.000    0.672  rag
+Q08 emergency-visit protocol                0.333     1.000    0.502  rag
+Q09 patient-data privacy policy             1.000     1.000    0.812  rag
+Q10 follow-up-visit discount policy         1.000     1.000    0.800  rag
+Q11 second-opinion process                  1.000     1.000    0.724  rag
+Q12 home-visit eligibility                  1.000     1.000    0.707  rag
+Q13 OUT-OF-SCOPE (sports)                   0.000     1.000    1.000  rag
+Q14 OUT-OF-SCOPE (medical advice)           0.000     1.000    1.000  rag
+Q15 EDGE CASE (one-word, ambiguous)         0.000     1.000    0.000  rag
+------------------------------------------------------------------------------------------------
+AVG                                         0.756     1.000    0.676
+
+Saved evaluation/rag_triad_results.json
