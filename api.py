@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import config
+from agent.graph import GlobalTimeoutError, arun_agent
 
 app = FastAPI(title="Practo Domain Support Agent", version="1.0.0")
 
@@ -64,3 +65,19 @@ class AddDocumentResponse(BaseModel):
     trace_id: str
     doc_id: str
     chunks_indexed: dict[str, int]
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok", "mock_llm": config.MOCK_LLM, "collection": config.AGENT_COLLECTION}
+
+
+@app.post("/ask", response_model=AskResponse)
+async def ask_endpoint(body: AskRequest, request: Request) -> AskResponse:
+    trace_id = getattr(request.state, "trace_id", None) or uuid.uuid4().hex
+    try:
+        res = await arun_agent(body.question, body.thread_id, trace_id=trace_id)
+    except GlobalTimeoutError:
+        raise HTTPException(status_code=504, detail="Agent run exceeded global timeout")
+    request.state.route = res.get("route")
+    return AskResponse(**res)
