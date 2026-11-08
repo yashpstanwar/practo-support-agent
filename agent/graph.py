@@ -17,6 +17,7 @@ from typing import Annotated, Any, Optional, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 import config
 from agent import memory as mem
@@ -226,13 +227,22 @@ async def save_memory(state: AgentState, config: RunnableConfig) -> dict:
     return {"last_record_id": last, "node_log": ["save_memory"]}
 
 
+STATUS_RETRY = RetryPolicy(
+    max_attempts=config.RETRY_MAX_ATTEMPTS,
+    initial_interval=config.RETRY_INITIAL_INTERVAL,
+    backoff_factor=config.RETRY_BACKOFF_FACTOR,
+    max_interval=config.RETRY_MAX_INTERVAL,
+    jitter=config.RETRY_JITTER,
+    retry_on=TransientBackendError,
+)
+
 def build_graph(checkpointer: Any = None, interrupt_before: list[str] | None = None):
     g = StateGraph(AgentState)
     g.add_node("load_memory", load_memory)
     g.add_node("input_guard", input_guard)
     g.add_node("classify_intent", classify_intent)
     g.add_node("rag_tool", rag_tool)
-    g.add_node("status_tool", status_tool)
+    g.add_node("status_tool", status_tool, retry_policy=STATUS_RETRY)
     g.add_node("blocked", blocked)
     g.add_node("clarify", clarify)
     g.add_node("output_guard", output_guard)
