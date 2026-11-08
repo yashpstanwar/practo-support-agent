@@ -1,0 +1,36 @@
+$ MOCK_LLM=1 python -m demos.demo_checkpoint
+
+PHASE 1 - run thread_id='ckpt-demo-1', deliberately stopping before 'output_guard'
+    [node:load_memory] thread=ckpt-demo-1 prior_turns=0 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=rag
+    [node:rag_tool] top1=0.722 fallback=False docs=['06_lab_turnaround', '06_lab_turnaround', '06_lab_turnaround']
+
+  STOPPED. next node(s) pending: ('output_guard',)
+  nodes completed so far (node_log): ['load_memory', 'input_guard', 'classify_intent', 'rag_tool']
+  checkpoint_id: 1f1db3a2-3043-6c5a-8004-f4f629125950
+  checkpoints stored in checkpoints.sqlite: 6
+
+------------------------------------------------------------------------------
+PHASE 2 - NEW PROCESS, reopened checkpoints.sqlite, thread_id='ckpt-demo-1'
+  State LOADED FROM CHECKPOINT (nothing recomputed):
+    next              = ('output_guard',)
+    node_log          = ['load_memory', 'input_guard', 'classify_intent', 'rag_tool']
+    route             = rag
+    top1 similarity   = 0.7221
+    retrieved chunks  = ['06_lab_turnaround::sent::1', '06_lab_turnaround::sent::2', '06_lab_turnaround::sent::0']
+    draft_answer      = Specialised tests such as thyroid panels and vitamin levels take 48 to 72 hours.
+
+  Resuming with graph.ainvoke(None, same thread_id) - watch which nodes execute:
+    [node:output_guard] grounded=True reason=all_sentences_supported
+    [node:output_guard]   support sim=1.000 supported=True | Specialised tests such as thyroid panels and vitamin levels take 48 to
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 1 turn(s), last_record_id=None -> ckpt-demo-1.json
+
+  final node_log    = ['load_memory', 'input_guard', 'classify_intent', 'rag_tool', 'output_guard', 'format_response', 'save_memory']
+  executed in phase 2 only: ['output_guard', 'format_response', 'save_memory']
+  final answer      = Specialised tests such as thyroid panels and vitamin levels take 48 to 72 hours.
+
+OK: the 4 nodes finished in phase 1 were loaded from the SQLite checkpoint and NOT re-executed; only the 3 remaining nodes ran.
+
+------------------------------------------------------------------------------
