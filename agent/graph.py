@@ -226,7 +226,7 @@ async def save_memory(state: AgentState, config: RunnableConfig) -> dict:
     return {"last_record_id": last, "node_log": ["save_memory"]}
 
 
-def build_graph():
+def build_graph(checkpointer: Any = None, interrupt_before: list[str] | None = None):
     g = StateGraph(AgentState)
     g.add_node("load_memory", load_memory)
     g.add_node("input_guard", input_guard)
@@ -249,7 +249,7 @@ def build_graph():
     g.add_edge("output_guard", "format_response")
     g.add_edge("format_response", "save_memory")
     g.add_edge("save_memory", END)
-    return g.compile()
+    return g.compile(checkpointer=checkpointer, interrupt_before=interrupt_before)
 
 
 _DEFAULT_GRAPH = None
