@@ -1,9 +1,23 @@
-"""Task 7 (+8, 9, 10) - the LangGraph support agent.
+"""Task 7 (+8, 9, 10, 15, 16) - the LangGraph support agent.
 
 Nodes (10):
   load_memory -> input_guard -> classify_intent --(conditional edge)--> one of
       rag_tool | status_tool | blocked | clarify
   -> output_guard -> format_response -> save_memory -> END
+
+* classify_intent's conditional edge routes on query intent: questions that
+  mention an appointment ID (APT-XXXX), or refer back to the appointment held
+  in memory, go to `status_tool`; injection attempts go to `blocked`; status
+  questions with no ID go to `clarify`; everything else goes to `rag_tool`.
+* rag_tool has a per-node timeout (config.NODE_TIMEOUT_SECONDS).
+* status_tool has an exponential-backoff RetryPolicy for transient backend errors.
+* run_agent wraps the whole graph in a global timeout (config.GLOBAL_TIMEOUT_SECONDS).
+
+Simulation knobs (used only by demos), passed via config["configurable"]:
+  simulate_delay: {node_name: seconds}    -> asyncio.sleep inside that node
+  simulate_transient_failures: int        -> status backend fails the first N calls
+  force_draft_answer: str                 -> replaces the generator output (to test
+                                             the output-side groundedness guard)
 """
 from __future__ import annotations
 
@@ -63,6 +77,7 @@ class AgentState(TypedDict, total=False):
     node_log: Annotated[list, operator.add]
 
 
+# --------------------------------------------------------------------------- helpers
 _FLAKY_CALLS: dict[str, int] = {}
 
 
@@ -82,6 +97,7 @@ async def _maybe_delay(node: str, config_: RunnableConfig | None) -> None:
         await asyncio.sleep(d)
 
 
+# --------------------------------------------------------------------------- nodes
 async def load_memory(state: AgentState, config: RunnableConfig) -> dict:
     await _maybe_delay("load_memory", config)
     m = mem.load(state["thread_id"])
@@ -97,6 +113,7 @@ async def input_guard(state: AgentState, config: RunnableConfig) -> dict:
     inj, match = detect_injection(masked)
     _log("input_guard", f"pii_masked={pii['pii_masked']} injection={inj}"
                         + (f" match='{match}'" if match else ""))
+    # Overwrite the raw question: downstream nodes, memory and logs only see masked text.
     return {"question": masked, "pii": pii, "injection": inj, "injection_match": match,
             "node_log": ["input_guard"]}
 
@@ -136,6 +153,14 @@ async def rag_tool(state: AgentState, config: RunnableConfig) -> dict:
 
 async def status_tool(state: AgentState, config: RunnableConfig) -> dict:
     await _maybe_delay("status_tool", config)
+    fail_n = int(_cfg(config).get("simulate_transient_failures", 0))
+    key = state["trace_id"]
+    _FLAKY_CALLS[key] = _FLAKY_CALLS.get(key, 0) + 1
+    attempt = _FLAKY_CALLS[key]
+    if attempt <= fail_n:
+        _log("status_tool", f"attempt {attempt} at t={time.monotonic():.2f}: records backend "
+                            f"unavailable -> raising TransientBackendError")
+        raise TransientBackendError(f"records backend timeout (simulated, attempt {attempt})")
     rec = check_appointment_status(state["record_id"])
     if not rec["found"]:
         draft = f"I couldn't find an appointment with ID {rec['record_id']}. Please check the ID and try again."
@@ -148,7 +173,7 @@ async def status_tool(state: AgentState, config: RunnableConfig) -> dict:
                + ("escalated to the patient-experience team." if rec["escalate"] else "no escalation needed."))
         parts = [fee, status, fu, esc] if re.search(r"\b(fee|cost|charge)\b", q) else [status, fee, fu, esc]
         draft = " ".join(parts)
-    _log("status_tool", f"success, found={rec['found']}")
+    _log("status_tool", f"attempt {attempt} at t={time.monotonic():.2f}: success, found={rec['found']}")
     return {"appointment": rec, "draft_answer": draft, "hits": [], "top1": 1.0,
             "node_log": ["status_tool"]}
 
@@ -176,6 +201,9 @@ async def output_guard(state: AgentState, config: RunnableConfig) -> dict:
         else:
             answer = REFUSAL_UNGROUNDED
         _log("output_guard", f"grounded={g['grounded']} reason={g['reason']}")
+        for s in g["support"]:
+            _log("output_guard", f"  support sim={s['best_context_sim']:.3f} supported={s['supported']} "
+                                 f"| {s['sentence'][:70]}")
         return {"answer": answer, "grounded": g["grounded"], "guard_reason": g["reason"],
                 "node_log": ["output_guard"]}
     if route == "appointment_status":
@@ -206,11 +234,15 @@ async def format_response(state: AgentState, config: RunnableConfig) -> dict:
                        "injection_detected": bool(state.get("injection")),
                        "grounded": state.get("grounded"),
                        "reason": state.get("guard_reason")},
-        "mock_llm": bool(config.MOCK_LLM),
+        "mock_llm": config_mock(),
     }
-    validate_response(resp)
+    validate_response(resp)  # raises SchemaValidationError if non-conforming
     _log("format_response", "response validated against RESPONSE_SCHEMA")
     return {"response": resp, "node_log": ["format_response"]}
+
+
+def config_mock() -> bool:
+    return bool(config.MOCK_LLM)
 
 
 async def save_memory(state: AgentState, config: RunnableConfig) -> dict:
@@ -227,6 +259,7 @@ async def save_memory(state: AgentState, config: RunnableConfig) -> dict:
     return {"last_record_id": last, "node_log": ["save_memory"]}
 
 
+# --------------------------------------------------------------------------- graph
 STATUS_RETRY = RetryPolicy(
     max_attempts=config.RETRY_MAX_ATTEMPTS,
     initial_interval=config.RETRY_INITIAL_INTERVAL,
@@ -236,12 +269,14 @@ STATUS_RETRY = RetryPolicy(
     retry_on=TransientBackendError,
 )
 
-def build_graph(checkpointer: Any = None, interrupt_before: list[str] | None = None):
+
+def build_graph(checkpointer: Any = None, interrupt_before: list[str] | None = None,
+                node_timeout: float = config.NODE_TIMEOUT_SECONDS):
     g = StateGraph(AgentState)
     g.add_node("load_memory", load_memory)
     g.add_node("input_guard", input_guard)
     g.add_node("classify_intent", classify_intent)
-    g.add_node("rag_tool", rag_tool)
+    g.add_node("rag_tool", rag_tool, timeout=node_timeout)
     g.add_node("status_tool", status_tool, retry_policy=STATUS_RETRY)
     g.add_node("blocked", blocked)
     g.add_node("clarify", clarify)
@@ -272,13 +307,23 @@ def default_graph():
     return _DEFAULT_GRAPH
 
 
+class GlobalTimeoutError(TimeoutError):
+    pass
+
+
 async def arun_agent(question: str, thread_id: str = "default", *, trace_id: str | None = None,
-                     simulate: dict | None = None, graph=None) -> dict:
+                     simulate: dict | None = None, graph=None,
+                     global_timeout: float = config.GLOBAL_TIMEOUT_SECONDS) -> dict:
     trace_id = trace_id or uuid.uuid4().hex
     graph = graph or default_graph()
     inputs = {"thread_id": thread_id, "trace_id": trace_id, "question": question, "node_log": []}
     cfg = {"configurable": {"thread_id": f"{thread_id}:{trace_id}", **(simulate or {})}}
-    state = await graph.ainvoke(inputs, cfg)
+    try:
+        state = await asyncio.wait_for(graph.ainvoke(inputs, cfg), timeout=global_timeout)
+    except asyncio.TimeoutError as e:
+        raise GlobalTimeoutError(f"graph run exceeded global timeout of {global_timeout}s") from e
+    finally:
+        _FLAKY_CALLS.pop(trace_id, None)
     return state["response"]
 
 
