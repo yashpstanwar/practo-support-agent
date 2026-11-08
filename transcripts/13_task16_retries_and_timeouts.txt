@@ -1,0 +1,50 @@
+$ MOCK_LLM=1 python -m demos.demo_resilience
+
+Retry: max_attempts=4 initial_interval=0.5s backoff_factor=2.0 max_interval=4.0s jitter=True
+Per-node timeout (rag_tool) = 5.0s; global graph timeout = 8.0s
+
+==============================================================================
+(a) RETRY - status backend fails the first 2 calls, then succeeds
+==============================================================================
+    [node:load_memory] thread=resilience prior_turns=0 last_record_id=None
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1047
+    [node:status_tool] attempt 1 at t=2299.61: records backend unavailable -> raising TransientBackendError
+    [node:status_tool] attempt 2 at t=2300.25: records backend unavailable -> raising TransientBackendError
+    [node:status_tool] attempt 3 at t=2302.01: success, found=True
+    [node:output_guard] answer built from tool result -> grounded
+    [node:format_response] response validated against RESPONSE_SCHEMA
+    [node:save_memory] saved 1 turn(s), last_record_id=APT-1047 -> resilience.json
+  -> succeeded after 2.42s: Appointment APT-1047 (General Medicine) is currently Scheduled. The consultation fee is INR 350. A follow-up visit is required. Escalation score 0.85 (threshold 0.80): escalated to the patient-experience team.
+  OK: recovered on attempt 3 of 4 (within the configured max_attempts)
+
+  (a2) control: 5 consecutive failures > max_attempts=4 -> clean, bounded failure
+    [node:load_memory] thread=resilience prior_turns=1 last_record_id=APT-1047
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=appointment_status record_id=APT-1047
+    [node:status_tool] attempt 1 at t=2302.02: records backend unavailable -> raising TransientBackendError
+    [node:status_tool] attempt 2 at t=2303.44: records backend unavailable -> raising TransientBackendError
+    [node:status_tool] attempt 3 at t=2305.05: records backend unavailable -> raising TransientBackendError
+    [node:status_tool] attempt 4 at t=2307.23: records backend unavailable -> raising TransientBackendError
+  -> gave up after 5.22s with TransientBackendError: records backend timeout (simulated, attempt 4)
+
+==============================================================================
+(b) PER-NODE TIMEOUT - rag_tool simulates a 30s vector-store call (limit 5.0s)
+==============================================================================
+    [node:load_memory] thread=resilience prior_turns=1 last_record_id=APT-1047
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] route=rag
+    [node:rag_tool] simulated slow call: sleeping 30s
+  -> langgraph.errors.NodeTimeoutError after 5.01s: Node 'rag_tool' exceeded its run timeout of 5.000s (elapsed: 5.005s).
+  OK: clean error at ~5.0s instead of hanging for 30s
+
+==============================================================================
+(c) GLOBAL TIMEOUT - three nodes each take 3s (each under any per-node limit), total 9s > 8.0s
+==============================================================================
+    [node:load_memory] simulated slow call: sleeping 3s
+    [node:load_memory] thread=resilience prior_turns=1 last_record_id=APT-1047
+    [node:input_guard] simulated slow call: sleeping 3s
+    [node:input_guard] pii_masked=False injection=False
+    [node:classify_intent] simulated slow call: sleeping 3s
+  -> GlobalTimeoutError after 8.00s: graph run exceeded global timeout of 8.0s
+  OK: the whole run was cancelled at the global limit; save_memory never ran (memory still holds 1 turn, from step (a)).
