@@ -308,3 +308,45 @@ here). Q07 shows the extractive generator's limit: it answers with related telem
 sentences rather than the exact "not suitable for chest pain" sentence.
 
 ---
+
+## Part 4 — Resilience & interoperability
+
+* **Task 14 — MCP.** `mcp_server.py` wraps `check_appointment_status` (with a full
+  docstring that becomes the MCP tool description) using `fastmcp` and serves
+  streamable HTTP at **`http://127.0.0.1:8000/mcp`**. `mcp_client.py` is a separate
+  script/process that lists tools and calls the tool for `APT-1002`, `APT-1007` (and an
+  unknown `APT-9999`), printing the standardized MCP result (`content`, `structuredContent`, `isError`).
+* **Task 15 — SQLite checkpointing.** `AsyncSqliteSaver` from
+  `langgraph-checkpoint-sqlite`, database `checkpoints.sqlite`, keyed by
+  `thread_id="ckpt-demo-1"`. Phase 1 runs `load_memory → input_guard → classify_intent →
+  rag_tool` and is deliberately stopped with `interrupt_before=["output_guard"]`.
+  Phase 2 runs in a **new Python process**, prints the state loaded from the checkpoint
+  (retrieved chunks, draft answer, `node_log`) and resumes the same thread: only
+  `output_guard, format_response, save_memory` execute. `node_log` has an append
+  reducer, so a re-executed node would appear twice — it doesn't.
+* **Task 16 — timeouts and retries.**
+  * Retry policy on `status_tool` (LangGraph `RetryPolicy`): **max_attempts = 4,
+    initial_interval = 0.5 s, backoff_factor = 2.0, max_interval = 4.0 s, jitter = True**,
+    retrying only `TransientBackendError`. A simulated backend fails the first 2 calls
+    via a counter and succeeds on attempt 3; a control run with 5 failures gives up
+    cleanly after 4 attempts.
+  * Per-node timeout: `rag_tool` is added with `timeout=5.0` s; a simulated 30 s
+    vector-store call raises `langgraph.errors.NodeTimeoutError` after ~5 s.
+  * Global timeout: every run goes through `asyncio.wait_for(graph.ainvoke(...), 8.0)`;
+    three nodes taking 3 s each (9 s total) are cancelled at 8 s with
+    `GlobalTimeoutError`, and `save_memory` never runs.
+
+---
+
+## MOCK_LLM and the optional real LLM
+
+`MOCK_LLM=1` is the default and the only mode used for grading — no keys, no network for
+generation or judging. Setting `MOCK_LLM=0` with `OPENAI_API_KEY` sends the same
+grounded-generation prompt and judge prompts to a real model (`llm.py`); nothing in the
+acceptance criteria depends on it.
+
+## Notes
+
+* All patient data, phone numbers and policies are fabricated for this exercise.
+* `chroma_db/`, `memory_store/` and `checkpoints.sqlite` are generated at runtime and
+  git-ignored; `python run_all.py` recreates them.

@@ -1,0 +1,25 @@
+$ MOCK_LLM=1 python -m demos.demo_mcp
+
+MCP server process started (pid=1484) at http://127.0.0.1:8000/mcp
+
+Connected to MCP server at http://127.0.0.1:8000/mcp
+  tool: check_appointment_status
+    description: Look up a Practo appointment by its record ID and return its status.
+    inputSchema: {"type": "object", "additionalProperties": false, "properties": {"record_id": {"type": "string", "description": "The appointment ID in the format \"APT-XXXX\" (for example \"APT-1007\")."}}, "required": ["record_id"]}
+
+>>> tools/call check_appointment_status(record_id='APT-1002')
+    isError: False
+    content[text]: {"found":true,"record_id":"APT-1002","category":"General Medicine","status":"Completed","consultation_fee_inr":600,"follow_up_required":true,"days_since_created":29,"escalation_score":0.9867,"escalation_threshold":0.8,"escalate":true}
+    structuredContent: {"found": true, "record_id": "APT-1002", "category": "General Medicine", "status": "Completed", "consultation_fee_inr": 600, "follow_up_required": true, "days_since_created": 29, "escalation_score": 0.9867, "escalation_threshold": 0.8, "escalate": true}
+
+>>> tools/call check_appointment_status(record_id='APT-1007')
+    isError: False
+    content[text]: {"found":true,"record_id":"APT-1007","category":"Orthopedics","status":"Scheduled","consultation_fee_inr":1100,"follow_up_required":false,"days_since_created":24,"escalation_score":0.32,"escalation_threshold":0.8,"escalate":false}
+    structuredContent: {"found": true, "record_id": "APT-1007", "category": "Orthopedics", "status": "Scheduled", "consultation_fee_inr": 1100, "follow_up_required": false, "days_since_created": 24, "escalation_score": 0.32, "escalation_threshold": 0.8, "escalate": false}
+
+>>> tools/call check_appointment_status(record_id='APT-9999')
+    isError: False
+    content[text]: {"found":false,"record_id":"APT-9999","error":"No appointment found with ID APT-9999."}
+    structuredContent: {"found": false, "record_id": "APT-9999", "error": "No appointment found with ID APT-9999."}
+
+OK: separate client process called the MCP tool for 3 record IDs (2 valid, 1 unknown).
