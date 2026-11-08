@@ -337,3 +337,16 @@ sentences rather than the exact "not suitable for chest pain" sentence.
     `GlobalTimeoutError`, and `save_memory` never runs.
 
 ---
+
+## MOCK_LLM and the optional real LLM
+
+`MOCK_LLM=1` is the default and the only mode used for grading — no keys, no network for
+generation or judging. Setting `MOCK_LLM=0` with `OPENAI_API_KEY` sends the same
+grounded-generation prompt and judge prompts to a real model (`llm.py`); nothing in the
+acceptance criteria depends on it.
+
+## Notes
+
+* All patient data, phone numbers and policies are fabricated for this exercise.
+* `chroma_db/`, `memory_store/` and `checkpoints.sqlite` are generated at runtime and
+  git-ignored; `python run_all.py` recreates them.
