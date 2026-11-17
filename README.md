@@ -1,4 +1,4 @@
-# Practo Domain Support Agent (LangGraph) — Final Capstone
+# Practo Domain Support Agent (LangGraph)
 
 **Track completed: Practo (Healthcare).**
 
